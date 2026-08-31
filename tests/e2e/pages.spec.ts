@@ -253,3 +253,17 @@ test.describe('page operations', () => {
     expect(annots?.size() ?? 0).toBeGreaterThan(0);
   });
 });
+test('shows a preview for every page of a long document', async ({ page }) => {
+  // 200 pages render in about a second, so previews are built eagerly rather
+  // than lazily. This guards that: if it ever stops scaling, the fix is
+  // windowing the list, and this test is what should fail first.
+  await page.goto('/');
+  await page.getByTestId('file-input').setInputFiles(
+    fileURLToPath(new URL('./fixtures/large.pdf', import.meta.url)),
+  );
+  await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 120_000 });
+  await page.getByTestId('toggle-pages').click();
+
+  await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 120_000 });
+  await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(200);
+});
