@@ -20,6 +20,7 @@ import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
 import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
+import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
 
 interface OpenDocument {
   name: string;
@@ -82,6 +83,28 @@ export function App(): React.JSX.Element {
     setEditedSinceSave(edited);
     setDocument(next);
   }, []);
+
+  // Patch the form widgets the viewer draws wrong (max length, multiline font
+  // size). Runs against the viewer's shadow root, and keeps running: widgets
+  // are rebuilt as pages scroll and as the zoom changes.
+  useEffect(() => {
+    if (!document || !registry) return;
+
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+
+    void readFieldConstraints(document.bytes).then((constraints) => {
+      const host = window.document.querySelector('embedpdf-container');
+      const root = host?.shadowRoot;
+      if (cancelled || !root) return;
+      stop = watchFormFields(root, constraints);
+    });
+
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [document, registry]);
 
   // The panel lists pages by their stored rotation, which is read from the
   // bytes rather than the viewer so it stays right after every operation.
@@ -204,8 +227,16 @@ export function App(): React.JSX.Element {
   /**
    * Anything that would be lost by closing or replacing the document: edits this
    * app made, plus edits made inside the viewer.
+   *
+   * Asked at the moment it is needed rather than during render. Annotating
+   * happens entirely inside the viewer — this app is never told and nothing
+   * re-renders — so a value computed at render time would still say "clean"
+   * long after the document stopped being clean.
    */
-  const hasUnsavedChanges = editedSinceSave || viewerHasUnsavedChanges(registry);
+  const hasUnsavedChanges = useCallback(
+    (): boolean => editedSinceSave || viewerHasUnsavedChanges(registry),
+    [editedSinceSave, registry],
+  );
 
   const closeDocument = useCallback(() => {
     setPagesOpen(false);
@@ -225,7 +256,7 @@ export function App(): React.JSX.Element {
 
   const requestAction = useCallback(
     (action: PendingAction): boolean => {
-      if (!document || !hasUnsavedChanges) return true;
+      if (!document || !hasUnsavedChanges()) return true;
       setPending(action);
       return false;
     },

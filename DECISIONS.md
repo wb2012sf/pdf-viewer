@@ -164,6 +164,16 @@ One line per assumption made instead of interrupting a session, newest last.
   unexpected pass. The multiline one is auto-sizing: the viewer fits the font to the field's height, which is
   right for one line and wrong for a box meant to wrap.
 
+- 2026-08-31 — The unsaved-changes check asked the viewer during *render*, so annotating — which happens
+  entirely inside the viewer and re-renders nothing here — left the click handler holding a stale "clean".
+  Close and Open therefore warned only after a page operation. It is now asked at click time. The tests missed
+  it because every one of them made its change through this app's own controls; two now annotate instead.
+- 2026-08-31 — Two of the viewer's form defects are patched from outside it in
+  `src/lib/viewer/form-field-fixes.ts`: MaxLen is read from the document and applied to the widget, and an
+  auto-sized multiline widget is given a font that leaves room to wrap. Both make a document unusable rather
+  than untidy, which is what justifies reaching into another component's shadow DOM. A MutationObserver
+  reapplies them, since widgets are rebuilt on scroll and zoom.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

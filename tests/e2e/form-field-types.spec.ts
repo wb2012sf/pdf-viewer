@@ -64,29 +64,41 @@ test.describe('form field types', () => {
     expect(opacity).toBe('0');
   });
 
-  test.fail(
-    'KNOWN ISSUE: a max-length field does not limit what can be typed',
-    async ({ page }) => {
-      // The PDF says MaxLen 4, but the widget carries no maxlength attribute,
-      // so nothing stops a longer value being entered and saved.
-      await openFormTypes(page);
+  // The two below are viewer defects that this app patches from outside; see
+  // `src/lib/viewer/form-field-fixes.ts`.
 
-      await expect(widget(page, 'field.maxlength')).toHaveAttribute('maxlength', '4', { timeout: 5000 });
-    },
-  );
-
-  test.fail('KNOWN ISSUE: an auto-sized multiline field uses a one-line font', async ({ page }) => {
-    // With no explicit size the viewer fits the font to the field *height* —
-    // right for a single-line field, wrong for a multiline one, which then
-    // shows one enormous line instead of wrapping.
+  test('a max-length field limits what can be typed', async ({ page }) => {
     await openFormTypes(page);
 
-    const { fontSize, height } = await widget(page, 'field.multilineAuto').evaluate((el) => ({
-      fontSize: parseFloat(window.getComputedStyle(el).fontSize),
-      height: el.getBoundingClientRect().height,
-    }));
+    await expect(widget(page, 'field.maxlength')).toHaveAttribute('maxlength', '4', { timeout: 30_000 });
+  });
 
-    expect(fontSize).toBeLessThan(height / 3);
+  test('a max-length field refuses a longer value', async ({ page }) => {
+    // The attribute is only worth having if it actually stops the typing.
+    await openFormTypes(page);
+    await expect(widget(page, 'field.maxlength')).toHaveAttribute('maxlength', '4', { timeout: 30_000 });
+
+    await widget(page, 'field.maxlength').fill('123456789');
+
+    await expect(widget(page, 'field.maxlength')).toHaveValue('1234');
+  });
+
+  test('an auto-sized multiline field is readable and can wrap', async ({ page }) => {
+    // Left alone the viewer fits the font to the field *height* — right for a
+    // single line, wrong for a box meant to wrap, which then shows one
+    // enormous line.
+    await openFormTypes(page);
+
+    await expect
+      .poll(
+        () =>
+          widget(page, 'field.multilineAuto').evaluate((el) => {
+            const fontSize = parseFloat(window.getComputedStyle(el).fontSize);
+            return fontSize / el.getBoundingClientRect().height;
+          }),
+        { timeout: 30_000 },
+      )
+      .toBeLessThan(1 / 3);
   });
 
   test.fail('KNOWN ISSUE: a file-select field offers no file picker', async ({ page }) => {

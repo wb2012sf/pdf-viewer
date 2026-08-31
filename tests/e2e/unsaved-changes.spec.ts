@@ -18,8 +18,71 @@ async function rotateAPage(page: Page): Promise<void> {
   await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 }
 
+/**
+ * Makes a change *inside the viewer* rather than through this app's own
+ * controls — an annotation, which the app never sees directly and has to ask
+ * the viewer about.
+ */
+async function stampThePage(page: Page): Promise<void> {
+  await page.getByText('Insert', { exact: true }).click();
+
+  const tool = await page.evaluate(() => {
+    const element = document
+      .querySelector('embedpdf-container')
+      ?.shadowRoot?.querySelector('[aria-label="Rubber Stamp"]');
+    const rect = element!.getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  });
+  await page.mouse.click(tool.x, tool.y);
+  await page.waitForTimeout(2500);
+
+  const thumb = await page.evaluate(() => {
+    const root = document.querySelector('embedpdf-container')?.shadowRoot;
+    const element = Array.from(root!.querySelectorAll('img')).filter((img) => {
+      const width = img.getBoundingClientRect().width;
+      return width > 10 && width < 120;
+    })[0]!;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  });
+  await page.mouse.click(thumb.x, thumb.y);
+  await page.waitForTimeout(1500);
+
+  const target = await page.evaluate(() => {
+    const root = document.querySelector('embedpdf-container')?.shadowRoot;
+    const rect = Array.from(root!.querySelectorAll('img'))
+      .map((img) => img.getBoundingClientRect())
+      .filter((box) => box.width > 200)
+      .sort((a, b) => b.width - a.width)[0]!;
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 3 };
+  });
+  await page.mouse.click(target.x, target.y);
+  await page.waitForTimeout(2500);
+}
+
 test.describe('unsaved changes', () => {
   test.slow();
+
+  test('warns before closing after an annotation, not just after a page operation', async ({ page }) => {
+    // Annotating happens entirely inside the viewer: this app is never told,
+    // and nothing re-renders it. Asking at render time therefore reads a stale
+    // answer — which is how this shipped broken.
+    await openSample(page);
+    await stampThePage(page);
+
+    await page.getByTestId('close').click();
+
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  });
+
+  test('warns before opening another document after an annotation', async ({ page }) => {
+    await openSample(page);
+    await stampThePage(page);
+
+    await page.getByTestId('open-pdf').click();
+
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+  });
 
   test('closes straight away when nothing has been changed', async ({ page }) => {
     // Warning about work that does not exist trains people to click through
