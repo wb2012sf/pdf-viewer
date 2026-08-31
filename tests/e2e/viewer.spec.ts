@@ -26,3 +26,26 @@ test('renders a PDF picked from disk', async ({ page }) => {
 
   await page.screenshot({ path: 'test-results/screenshots/document-open.png', fullPage: true });
 });
+
+test('loads the stamp gallery from the bundle rather than a CDN', async ({ page }) => {
+  // The viewer normally fetches the rubber-stamp manifest and artwork from
+  // jsDelivr as it starts. Both now come from the build, so the gallery has to
+  // survive with no connection — see src/lib/viewer/stamps.ts.
+  const served: string[] = [];
+  const failed: string[] = [];
+  page.on('response', (response) => served.push(response.url()));
+  page.on('requestfailed', (request) => failed.push(request.url()));
+
+  await page.goto('/');
+  await page.getByTestId('file-input').setInputFiles(SAMPLE_PDF);
+  await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+
+  // The plugin loads its library as it initialises, so the bundled artwork
+  // being fetched is proof the local library was accepted; if the manifest were
+  // malformed, nothing would ask for the PDF at all.
+  await expect
+    .poll(() => served.filter((url) => /\/assets\/stamps-[^/]+\.pdf$/.test(url)), { timeout: 30_000 })
+    .toHaveLength(1);
+
+  expect(failed).toEqual([]);
+});

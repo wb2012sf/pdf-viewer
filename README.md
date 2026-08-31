@@ -70,8 +70,12 @@ Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled th
 ## Staying offline
 
 The packaged viewer fetches four things from the internet by default — the PDFium WASM binary, its own UI
-font, the signature dialog's cursive fonts, and a stamp gallery. `src/lib/viewer/offline-config.ts` turns each
-of those off and points the engine at the bundled binary instead.
+font, the signature dialog's cursive fonts, and the rubber-stamp gallery. `src/lib/viewer/offline-config.ts`
+points the engine and the stamp gallery at bundled assets, and turns off the two font downloads (the system
+font stack replaces them).
+
+The stamp gallery is built in `src/lib/viewer/stamps.ts` from `@embedpdf/default-stamps`. Only English is
+bundled; the package also carries de, nl, fr, es, sv, ja and zh-CN if another locale is wanted.
 
 This is enforced, not assumed: `tests/e2e/ocr.spec.ts` records every request the browser makes during a real
 OCR run and fails if any of them leaves the app's own origin.

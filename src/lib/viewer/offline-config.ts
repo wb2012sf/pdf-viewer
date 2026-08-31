@@ -2,15 +2,19 @@ import type { PDFViewerConfig } from '@embedpdf/react-pdf-viewer';
 // Bundled by Vite as a hashed asset, so the engine is served from the app
 // itself rather than fetched from a CDN at first render.
 import pdfiumWasmAsset from '@embedpdf/pdfium/pdfium.wasm?url';
+import { defaultStampLibrary } from './stamps';
 
 /**
  * The engine runs in a web worker, and Vite emits asset URLs relative to the
  * page. A worker resolves a relative URL against its *own* location — which is
  * also inside `assets/` — so the relative form becomes `assets/assets/…`, 404s,
  * and the viewer waits forever without logging anything. Absolute resolves the
- * same from either context.
+ * same from either context. Resolved on call, so importing this module does
+ * not require a `location` to exist.
  */
-const pdfiumWasmUrl = new URL(pdfiumWasmAsset, globalThis.location.href).href;
+function pdfiumWasmUrl(): string {
+  return new URL(pdfiumWasmAsset, globalThis.location.href).href;
+}
 
 /**
  * Viewer configuration that makes no network requests.
@@ -22,8 +26,9 @@ const pdfiumWasmUrl = new URL(pdfiumWasmAsset, globalThis.location.href).href;
  * anything at all, which is exactly what this app promises cannot happen
  * (see CLAUDE.md: the app must run for someone who has only been handed it).
  *
- * Each of these is turned off deliberately rather than left to a default, and
- * `tests/e2e/ocr.spec.ts` fails if any request leaves the app's own origin.
+ * Each is either pointed at a bundled asset or turned off deliberately, rather
+ * than left to a default. `tests/e2e/ocr.spec.ts` fails if any request leaves
+ * the app's own origin.
  */
 export function offlineViewerConfig(src: string): PDFViewerConfig {
   return {
@@ -31,7 +36,7 @@ export function offlineViewerConfig(src: string): PDFViewerConfig {
     theme: { preference: 'system' },
 
     // The engine itself.
-    wasmUrl: pdfiumWasmUrl,
+    wasmUrl: pdfiumWasmUrl(),
 
     // Fallback fonts for documents that reference a font they do not embed.
     // Disabled: a missing glyph is a far smaller problem than a viewer that
@@ -42,13 +47,14 @@ export function offlineViewerConfig(src: string): PDFViewerConfig {
     // `null` falls back to the system stack, which is present everywhere.
     fonts: { ui: null, signature: null },
 
-    // The viewer ships a decorative stamp gallery ("Approved", "Draft", …)
-    // whose manifest and artwork are fetched from jsDelivr. Both the library
-    // entry and the manifest list have to be cleared: they are separate
-    // options, and leaving `manifests` at its default still fires the request.
+    // The standard stamp gallery, supplied directly from the bundle instead of
+    // being fetched. `manifests` must be cleared as well: it is a separate
+    // option that still points at jsDelivr, and leaving it at its default
+    // fires the request regardless of what `libraries` contains.
     //
-    // This costs the built-in gallery, not the ability to stamp: placing a
-    // signature image is the signature plugin's job and stays local.
-    stamp: { defaultLibrary: false, manifests: [] },
+    // `defaultLibrary` is deliberately left alone — despite the name it is the
+    // container for stamps the *user* saves, not the built-in gallery, and
+    // disabling it would take away custom stamps for no gain.
+    stamp: { libraries: [defaultStampLibrary()], manifests: [] },
   };
 }

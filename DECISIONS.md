@@ -55,8 +55,18 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — Wiring OCR into the UI surfaced that the app was **not** actually offline: the packaged viewer
   fetched PDFium's WASM, Open Sans, the signature dialog's cursive fonts and a stamp gallery from jsDelivr and
   Google Fonts at runtime, despite the WASM also being bundled. `src/lib/viewer/offline-config.ts` disables all
-  four. The stamp gallery needed both `defaultLibrary: false` *and* `manifests: []`, as the snippet's built-in
-  manifest URL is a separate option; this costs the decorative gallery, not signature stamping.
+  four. (Superseded for stamps by the entry below, which bundles the gallery rather than dropping it.)
+- 2026-08-31 — The stamp gallery is bundled from `@embedpdf/default-stamps` rather than disabled. The plugin
+  accepts a library given directly (`libraries: [...]`), so the manifest is read at build time and the artwork
+  emitted as a hashed asset; the manifest's own relative `pdf` reference is never used. `manifests: []` is still
+  required, because that option points at jsDelivr independently of `libraries`. English only — the package
+  carries seven more locales if wanted.
+- 2026-08-31 — Corrected an earlier mistake: `stamp.defaultLibrary: false` was set while disabling the CDN
+  fetch, but despite the name that option is the container for stamps the *user* saves, not the built-in
+  gallery. It is now left at its default, so custom stamps work again. Only `manifests` needed clearing.
+- 2026-08-31 — Manifest stamp names are mapped to `PdfAnnotationName` through a checked lookup that rejects
+  both unknown names and numeric-enum reverse lookups (`PdfAnnotationName['13']` answers `'Approved'`). An
+  unmapped name would otherwise become `undefined` and yield a stamp that silently cannot be placed.
 - 2026-08-31 — `wasmUrl` must be made absolute with `new URL(asset, location.href).href`. Vite emits asset URLs
   relative to the page, the PDFium engine runs in a web worker, and a worker resolves a relative URL against
   its own location — which is also inside `assets/`. The result was `assets/assets/…`, a 404, and a viewer that
