@@ -15,8 +15,11 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — Test fixtures give page `i` a width of `100 + i`, so tests can assert page *identity* after
   a merge/split/reorder, not just page count. pdf-lib cannot extract text, so geometry is the structural
   signal available.
-- 2026-08-31 — `page-ops.ts` loads documents without `ignoreEncryption`, so an encrypted PDF fails loudly
-  instead of silently producing a broken copy.
+- 2026-08-31 — `page-ops.ts` detects encryption by loading with `ignoreEncryption: true` and then checking
+  `doc.isEncrypted`, rather than catching pdf-lib's `EncryptedPDFError`. Same refusal, but `instanceof` against
+  that class returns false in practice — pdf-lib ships both a CJS and an ESM build, and the thrown class is not
+  always the imported one. A boolean does not have that problem, and it lets the error name encryption rather
+  than reporting a parse failure.
 - 2026-08-31 — Scaffold only: no OCR module and no Tauri shell yet. `tesseract.js` is installed so the
   dependency decision is recorded, but no stub code was written for unbuilt features.
 

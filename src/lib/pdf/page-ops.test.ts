@@ -9,7 +9,7 @@ import {
   splitPdf,
 } from './page-ops';
 import { PdfInputError } from './errors';
-import { makePdf, pageOrder } from '../../test/fixtures';
+import { makeEncryptedPdf, makePdf, pageOrder } from '../../test/fixtures';
 
 describe('getPageCount', () => {
   it('reads the page count of a real PDF', async () => {
@@ -96,6 +96,48 @@ describe('splitPdf', () => {
 
   it('rejects an inverted range', async () => {
     await expect(splitPdf(await makePdf(3), [[2, 1]])).rejects.toThrow(/not a valid slice/);
+  });
+});
+
+describe('encrypted documents', () => {
+  // Encrypt/decrypt is out of scope (see CLAUDE.md), so the contract is that
+  // every entry point refuses an encrypted file outright. Silently loading one
+  // would mean writing out a document whose encrypted streams were copied as
+  // opaque bytes -- a file that opens as blank or garbled pages.
+
+  it('refuses to read an encrypted document', async () => {
+    await expect(getPageCount(await makeEncryptedPdf())).rejects.toBeInstanceOf(PdfInputError);
+  });
+
+  it('says the file is password-protected rather than unparseable', async () => {
+    await expect(getPageCount(await makeEncryptedPdf())).rejects.toThrow(/password-protected/);
+  });
+
+  it('does not blame corruption for an encrypted file', async () => {
+    // The generic parse-failure wording would send the user hunting for damage
+    // that isn't there.
+    await expect(getPageCount(await makeEncryptedPdf())).rejects.not.toThrow(/could not be parsed/);
+  });
+
+  it('refuses an encrypted document in every page operation', async () => {
+    const encrypted = await makeEncryptedPdf(3);
+
+    await expect(extractPages(encrypted, [0])).rejects.toThrow(/password-protected/);
+    await expect(reorderPages(encrypted, [0, 1, 2])).rejects.toThrow(/password-protected/);
+    await expect(splitPdf(encrypted, [[0, 1]])).rejects.toThrow(/password-protected/);
+    await expect(rotatePages(encrypted, [0], 90)).rejects.toThrow(/password-protected/);
+    await expect(getPageRotations(encrypted)).rejects.toThrow(/password-protected/);
+  });
+
+  it('names which merge input is encrypted', async () => {
+    await expect(mergePdfs([await makePdf(1), await makeEncryptedPdf()])).rejects.toThrow(
+      /merge input 2: this PDF is password-protected/,
+    );
+  });
+
+  it('leaves unencrypted documents unaffected', async () => {
+    // Guards against a refusal so broad it starts rejecting ordinary files.
+    expect(await getPageCount(await makePdf(2))).toBe(2);
   });
 });
 

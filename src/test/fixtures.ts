@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, PDFHexString, StandardFonts, degrees } from 'pdf-lib';
 
 /**
  * Builds an in-memory PDF whose pages are individually identifiable.
@@ -27,6 +27,42 @@ export async function makePdf(pageCount: number, options: FixtureOptions = {}): 
     }
   }
   return doc.save();
+}
+
+/**
+ * Builds a PDF that presents itself as password-protected.
+ *
+ * Nothing in this stack can produce a genuinely encrypted PDF — that is exactly
+ * why encrypt/decrypt is out of scope — so the fixture carries the marker a
+ * reader actually keys on: an /Encrypt dictionary referenced from the trailer.
+ * A real password-protected file presents the same marker, and it is what the
+ * refusal in `lib/pdf/page-ops.ts` must trip on.
+ */
+export async function makeEncryptedPdf(pageCount = 1): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  for (let index = 0; index < pageCount; index += 1) {
+    doc.addPage([PAGE_WIDTH_BASE + index, PAGE_HEIGHT]);
+  }
+
+  // Standard security handler, RC4 40-bit (V1/R2) — the oldest scheme every
+  // conforming reader recognises. The O/U hashes are placeholders because no
+  // reader gets far enough to verify them: the dictionary's presence is the
+  // whole signal.
+  const { context } = doc;
+  const encrypt = context.obj({
+    Filter: 'Standard',
+    V: 1,
+    R: 2,
+    O: PDFHexString.of('0'.repeat(64)),
+    U: PDFHexString.of('0'.repeat(64)),
+    P: -1,
+  });
+  context.trailerInfo.Encrypt = context.register(encrypt);
+
+  // Cross-reference *streams* would bury the trailer inside a compressed
+  // object; a classic trailer keeps the /Encrypt entry where a plain reader
+  // (and a human running `tail` on the fixture) will find it.
+  return doc.save({ useObjectStreams: false });
 }
 
 /**

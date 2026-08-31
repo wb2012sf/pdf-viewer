@@ -5,19 +5,33 @@ import { PdfInputError, assertPageIndices, assertPdfBytes } from './errors';
 export type Rotation = 0 | 90 | 180 | 270;
 
 /**
- * Loads a PDF for structural editing.
- *
- * `ignoreEncryption` is deliberately off. Encrypting and decrypting PDFs is out
- * of scope (see CLAUDE.md), so this tool has no way to unlock a protected file
- * — it must fail loudly here rather than silently producing a broken copy.
+ * Loads a PDF for structural editing, refusing anything this tool cannot
+ * faithfully write back out.
  */
 async function load(bytes: Uint8Array, label: string): Promise<PDFDocument> {
   assertPdfBytes(bytes, label);
+
+  let doc: PDFDocument;
   try {
-    return await PDFDocument.load(bytes);
+    // Loaded past pdf-lib's own encryption guard so that the check below can
+    // report *why* the file is unusable. `isEncrypted` is a plain boolean,
+    // which keeps this independent of pdf-lib's error classes surviving the
+    // bundler's choice between its CJS and ESM builds.
+    doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
   } catch (cause) {
     throw new PdfInputError(`${label}: could not be parsed as a PDF (${String(cause)})`);
   }
+
+  // Encrypt/decrypt is out of scope (see CLAUDE.md): this tool can neither
+  // supply nor remove a password, and copying still-encrypted streams into a
+  // new document would emit a file that opens blank. An encrypted file is not
+  // a damaged one, so say so rather than reporting a parse failure.
+  if (doc.isEncrypted) {
+    throw new PdfInputError(
+      `${label}: this PDF is password-protected, and opening encrypted PDFs is not supported`,
+    );
+  }
+  return doc;
 }
 
 /** Number of pages in `bytes`. */
