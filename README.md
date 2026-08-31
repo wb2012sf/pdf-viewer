@@ -123,5 +123,5 @@ operations are asserted against real PDF output (page count, page identity, rota
 "it didn't throw": test fixtures give each page a distinct width so a test can prove *which* source
 page ended up where after a merge or reorder.
 
-See `CLAUDE.md` for the architectural decisions behind this stack and `DECISIONS.md` for
-assumptions made along the way.
+See `CLAUDE.md` for the architectural decisions behind this stack, `DECISIONS.md` for
+assumptions made along the way, and `KNOWN-ISSUES.md` for defects that live in a dependency.

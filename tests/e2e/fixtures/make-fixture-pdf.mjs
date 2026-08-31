@@ -47,6 +47,52 @@ async function write(name, bytes) {
   await write('form.pdf', await doc.save());
 }
 
+// The field types reported as misbehaving in the viewer, one of each, laid out
+// with generous spacing so a test can click any of them by position.
+{
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([420, 700]);
+  const form = doc.getForm();
+
+  page.drawText('Country (dropdown)', { x: 40, y: 650, size: 11, font });
+  const country = form.createDropdown('field.dropdown');
+  country.addOptions(['Switzerland', 'Germany', 'France']);
+  country.select('Switzerland');
+  country.addToPage(page, { x: 40, y: 610, width: 240, height: 30, font });
+
+  page.drawText('PIN (max length 4)', { x: 40, y: 560, size: 11, font });
+  const pin = form.createTextField('field.maxlength');
+  pin.setMaxLength(4);
+  pin.addToPage(page, { x: 40, y: 520, width: 120, height: 30, font });
+
+  page.drawText('Notes (multiline, 10pt)', { x: 40, y: 470, size: 11, font });
+  const notes = form.createTextField('field.multiline');
+  notes.enableMultiline();
+  notes.addToPage(page, { x: 40, y: 380, width: 300, height: 80, font });
+  // Only after addToPage: the default-appearance entry it writes is what
+  // setFontSize edits.
+  notes.setFontSize(10);
+
+  // The same field with no explicit size, so its appearance says "auto".
+  // Auto-sizing is where a multiline box is most likely to be mishandled.
+  page.drawText('Notes (multiline, auto size)', { x: 40, y: 350, size: 11, font });
+  const notesAuto = form.createTextField('field.multilineAuto');
+  notesAuto.enableMultiline();
+  notesAuto.addToPage(page, { x: 40, y: 260, width: 300, height: 80, font });
+
+  page.drawText('Attachment (file select)', { x: 40, y: 230, size: 11, font });
+  const attachment = form.createTextField('field.attachment');
+  attachment.enableFileSelection();
+  attachment.addToPage(page, { x: 40, y: 190, width: 300, height: 30, font });
+
+  page.drawText('Submit (push button)', { x: 40, y: 155, size: 11, font });
+  const submit = form.createButton('field.submit');
+  submit.addToPage('Submit', page, { x: 40, y: 110, width: 120, height: 32, font });
+
+  await write('form-types.pdf', await doc.save());
+}
+
 // A stand-in for a scan. OCR reads the *rendered* page, so what matters is that
 // the ink is large and high-contrast enough to survive recognition -- this only
 // has to be a page Tesseract can read, not a genuine raster scan.
