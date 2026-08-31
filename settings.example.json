@@ -1,0 +1,67 @@
+{
+  "//1": "Starter .claude/settings.json for the PDF workbench project. Copy to .claude/settings.json and adjust. This file, not CLAUDE.md, is what actually silences permission prompts — CLAUDE.md only shapes what Claude attempts, it can't grant access.",
+  "//2": "defaultMode is 'auto' rather than 'bypassPermissions' on purpose. Deny rules block in every mode including bypassPermissions, but bypassPermissions itself gives no protection against prompt injection (per Anthropic's own docs) and is intended for network-isolated sandboxes, not an internet-connected VPS, even a disposable one. Auto mode gets you the same 'few prompts, long stretches' outcome via a background classifier while keeping that protection, and it's already the default starting mode on Pro/Max/Team plans, so this just makes it explicit.",
+  "//3": "git push stays denied deliberately, disposable VPS or not. The VPS filesystem is disposable; your git remote (GitHub/GitLab) is not, and it's likely the actual backup of this project if the VPS gets wiped. A push also can't be undone the way a local commit can, and may trigger CI/deploys you don't control from here. Wildcard Bash patterns are too easy to route around (e.g. distinguishing 'push to a feature branch' from 'push --force to main') to safely loosen with allow/deny rules alone — see the permissions doc's own warning on this. If you want unattended pushes to non-main branches, the reliable way is a PreToolUse hook that actually parses the git command, not a wildcard rule.",
+  "//4": "WebFetch is now a domain whitelist instead of a bare 'ask every time' rule. The bare ask rule is gone on purpose: it would have overridden every domain-specific allow below (ask beats allow regardless of specificity), so it had to go, not just get more entries added next to it. Any domain NOT listed here still isn't fetched blind: in auto mode (the default here), an unlisted domain goes to the background classifier instead of an allow, so it's reviewed automatically rather than either blocked outright or silently fetched. Two things this whitelist does NOT cover: WebSearch (no domain concept, always prompts/goes to the classifier separately), and Bash-driven network access (curl, npm install, docker pull) — those are governed by Bash permission rules and sandbox network settings, not by WebFetch(domain:...) rules, even though it's tempting to assume one list covers both.",
+  "//5": "Bash(rm -rf *) and Bash(git reset --hard *) are back in deny by explicit request, restoring the stricter original posture over the disposable-VPS loosening. Their narrow companion allow rules (rm -rf ./dist, rm -rf ./node_modules, git reset --hard HEAD) were removed rather than left in place, because a broad deny always wins over a narrower allow, so those would now be dead rules that silently never fire.",
+  "//6": "docker compose rules removed entirely: the project dropped Docker as a dependency (OCR moved from an ocrmypdf Docker sidecar to client-side Tesseract.js, and there's no server needing a container). WebFetch(domain:docs.docker.com) removed for the same reason. Left in place: tauri.app/v2.tauri.app, since Tauri is a live candidate for distributing this to friends without Docker or a server.",
+
+  "defaultMode": "auto",
+
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright *)",
+      "Bash(npx tsc *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git log *)",
+      "Edit(src/**)",
+      "Edit(tests/**)",
+      "Edit(e2e/**)",
+      "Edit(DECISIONS.md)",
+      "Edit(CHANGELOG.md)",
+
+      "WebFetch(domain:developer.mozilla.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "WebFetch(domain:npmjs.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:*.readthedocs.io)",
+      "WebFetch(domain:*.github.io)",
+
+      "WebFetch(domain:react.dev)",
+      "WebFetch(domain:typescriptlang.org)",
+      "WebFetch(domain:www.typescriptlang.org)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:vitest.dev)",
+      "WebFetch(domain:playwright.dev)",
+      "WebFetch(domain:embedpdf.com)",
+      "WebFetch(domain:www.embedpdf.com)",
+      "WebFetch(domain:mupdf.com)",
+      "WebFetch(domain:pdf-lib.js.org)",
+      "WebFetch(domain:tesseract.projectnaptha.com)",
+      "WebFetch(domain:tauri.app)",
+      "WebFetch(domain:v2.tauri.app)",
+      "WebFetch(domain:caddyserver.com)",
+
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:docs.claude.com)"
+    ],
+
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git reset --hard *)",
+      "Bash(rm -rf *)",
+      "Read(./.env)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)"
+    ]
+  }
+}
