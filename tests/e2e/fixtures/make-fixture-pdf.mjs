@@ -23,6 +23,30 @@ async function write(name, bytes) {
   await write('sample.pdf', await doc.save());
 }
 
+// A document with real AcroForm fields, for exercising the viewer's Form tab.
+// The fields are large and plainly labelled so a test can click them by
+// position without depending on the viewer's internal markup.
+{
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([420, 595]);
+  const form = doc.getForm();
+
+  page.drawText('Full name', { x: 48, y: 520, size: 14, font });
+  const name = form.createTextField('applicant.name');
+  name.addToPage(page, { x: 48, y: 470, width: 320, height: 34, font });
+
+  page.drawText('Reference', { x: 48, y: 420, size: 14, font });
+  const reference = form.createTextField('applicant.reference');
+  reference.addToPage(page, { x: 48, y: 370, width: 320, height: 34, font });
+
+  page.drawText('Agreed', { x: 48, y: 310, size: 14, font });
+  const agreed = form.createCheckBox('applicant.agreed');
+  agreed.addToPage(page, { x: 48, y: 268, width: 26, height: 26 });
+
+  await write('form.pdf', await doc.save());
+}
+
 // A stand-in for a scan. OCR reads the *rendered* page, so what matters is that
 // the ink is large and high-contrast enough to survive recognition -- this only
 // has to be a page Tesseract can read, not a genuine raster scan.

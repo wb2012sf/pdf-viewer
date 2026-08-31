@@ -15,6 +15,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // `tauri dev` runs this server while cargo is writing into src-tauri/target.
+      // Watching a DLL mid-link fails with EBUSY on Windows and kills the dev
+      // server, so the Rust build output is excluded from the watcher.
+      ignored: ['**/src-tauri/**'],
+    },
   },
   preview: {
     port: 4173,
