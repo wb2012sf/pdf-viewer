@@ -92,7 +92,7 @@ test.describe('page operations', () => {
     await expect
       .poll(() => page.getByTestId('pages-list').locator('img').count(), { timeout: 60_000 })
       .toBeGreaterThan(0);
-    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
     await thumbnailsSettle(page);
 
     await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(2);
@@ -105,7 +105,7 @@ test.describe('page operations', () => {
 
     // The panel re-reads rotations from the rewritten bytes, so this appearing
     // means the operation actually landed rather than just being requested.
-    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
     await viewerSettles(page);
 
     const saved = await saveAndLoad(page);
@@ -245,7 +245,7 @@ test.describe('page operations', () => {
     await page.getByTestId('toggle-pages').click();
     await page.getByTestId('page-0').check();
     await page.getByTestId('pages-rotate-right').click();
-    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
     await viewerSettles(page);
 
     const saved = await saveAndLoad(page);

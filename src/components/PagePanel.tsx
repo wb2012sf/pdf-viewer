@@ -4,6 +4,14 @@ import type { Thumbnail } from '../lib/pdf/thumbnails';
 export interface PagePanelProps {
   /** Rotation currently stored on each page, in document order. */
   rotations: readonly number[];
+  /**
+   * How far each page has been turned *since the document was opened*.
+   *
+   * Not the same as its stored rotation: plenty of documents carry `/Rotate 90`
+   * on a page that displays perfectly upright, and badging that "90°" tells the
+   * reader their page is sideways when it plainly is not.
+   */
+  turnedBy: readonly number[];
   /** Page previews; may lag the document briefly after an edit. */
   thumbnails: readonly Thumbnail[];
   thumbnailsStale: boolean;
@@ -36,6 +44,7 @@ export interface PagePanelProps {
  */
 export function PagePanel({
   rotations,
+  turnedBy,
   thumbnails,
   thumbnailsStale,
   selected,
@@ -131,15 +140,21 @@ export function PagePanel({
         >
           Split…
         </button>
-        <button type="button" onClick={onMerge} disabled={busy} data-testid="pages-merge">
-          Merge…
+        <button
+          type="button"
+          onClick={onMerge}
+          disabled={busy}
+          data-testid="pages-merge"
+          title="Add another PDF's pages to the end of this one"
+        >
+          Append…
         </button>
       </div>
 
       <p className="pages__hint">
         {hasSelection
-          ? `${String(selected.size)} of ${String(count)} selected · drag a page to reorder`
-          : 'Tick pages to act on them · drag a page to reorder'}
+          ? `${String(selected.size)} of ${String(count)} selected · Split starts a new document at each · drag to reorder`
+          : 'Tick pages to act on them · Append adds another PDF at the end · drag to reorder'}
       </p>
 
       {error !== null && (
@@ -153,8 +168,9 @@ export function PagePanel({
         data-testid="pages-list"
         data-stale={thumbnailsStale ? 'true' : 'false'}
       >
-        {rotations.map((rotation, index) => {
+        {rotations.map((_rotation, index) => {
           const thumb = byPage.get(index);
+          const turned = turnedBy[index] ?? 0;
           return (
             <li
               key={index}
@@ -207,9 +223,14 @@ export function PagePanel({
                 </span>
                 <span className="pages__number">
                   {index + 1}
-                  {rotation !== 0 && (
-                    <span className="pages__rotation" data-testid={`page-${String(index)}-rotation`}>
-                      {rotation}°
+                  {turned !== 0 && (
+                    <span
+                      className="pages__rotation"
+                      data-testid={`page-${String(index)}-rotation`}
+                      title="Turned since this document was opened"
+                    >
+                      {turned > 0 ? '+' : ''}
+                      {turned}°
                     </span>
                   )}
                 </span>

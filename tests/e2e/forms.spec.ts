@@ -106,7 +106,7 @@ test.describe('form filling', () => {
     await page.getByTestId('toggle-pages').click();
     await page.getByTestId('page-0').check();
     await page.getByTestId('pages-rotate-right').click();
-    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
     await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 
     const saved = await saveAndLoad(page);

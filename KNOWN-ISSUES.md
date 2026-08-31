@@ -82,6 +82,23 @@ So a "signature" placeholder field appearing in italics is the PDF asking for
 it. This is unrelated to the cursive faces in the Create Signature dialog, which
 apply only to signatures typed there.
 
+### The viewer's own Export does nothing in the desktop app — patched here
+
+The viewer answers its Export menu command by clicking a hidden `<a download>`.
+A browser downloads the file; the Tauri webview has no download manager and
+silently ignores it, so Export looked like a dead menu item in the packaged app.
+
+**Worked around** in `src/lib/viewer/export-bridge.ts`: under Tauri, the plugin's
+own request event is caught and the document saved through the OS dialog, with
+the document's real filename rather than the internal UUID the viewer uses. In a
+browser the bridge stays out of the way — the viewer's handler works there, and
+taking over as well would save the document twice.
+
+`disabledCategories: ['document-export']` does not remove the menu item in
+2.15.0, at the top level or under `ui`/`commands`, so hiding it was not an
+option. The same applies to `document-open` and `document-close`, which is why
+the viewer's menu still offers its own Open and Close — see the open item below.
+
 ### The dropdown arrow
 
 Reported as only appearing after clicking into the field. The arrow is part of

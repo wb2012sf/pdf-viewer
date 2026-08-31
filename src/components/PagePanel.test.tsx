@@ -17,6 +17,7 @@ function thumbsFor(count: number) {
 function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
   const props: PagePanelProps = {
     rotations: [0, 0, 0],
+    turnedBy: [0, 0, 0],
     thumbnails: thumbsFor(3),
     thumbnailsStale: false,
     selected: new Set<number>(),
@@ -65,12 +66,13 @@ describe('PagePanel', () => {
     expect(screen.getByTestId('pages-list').children).toHaveLength(4);
   });
 
-  it('shows the rotation a page already carries', () => {
-    renderPanel({ rotations: [0, 90, 0] });
+  it("badges only what has been turned since the document was opened", () => {
+    // A page can carry /Rotate 90 and still display upright; saying "90°" about
+    // it tells the reader their page is sideways when it plainly is not.
+    renderPanel({ rotations: [90, 90, 0], turnedBy: [0, 90, 0] });
 
-    expect(screen.getByTestId('page-1-rotation').textContent).toBe('90°');
-    // An upright page says nothing rather than "0°", which is noise.
-    expect(screen.queryByTestId('page-0-rotation')).toBeNull();
+    expect(screen.queryByTestId("page-0-rotation")).toBeNull();
+    expect(screen.getByTestId("page-1-rotation").textContent).toBe("+90°");
   });
 
   it('reports which page was ticked', () => {

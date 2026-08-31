@@ -14,7 +14,7 @@ async function rotateAPage(page: Page): Promise<void> {
   await page.getByTestId('toggle-pages').click();
   await page.getByTestId('page-0').check();
   await page.getByTestId('pages-rotate-right').click();
-  await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+  await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
   await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 }
 
@@ -117,7 +117,7 @@ test.describe('unsaved changes', () => {
     await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
     await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
     // And the change is still there, not quietly rolled back.
-    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°');
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°');
   });
 
   test('discarding closes the document', async ({ page }) => {

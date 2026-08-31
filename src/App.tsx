@@ -23,6 +23,7 @@ import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
 import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
+import { bridgeViewerExport } from './lib/viewer/export-bridge';
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
 
 interface OpenDocument {
@@ -59,6 +60,8 @@ export function App(): React.JSX.Element {
   const [editedSinceSave, setEditedSinceSave] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [rotations, setRotations] = useState<number[]>([]);
+  /** How far each page has been turned since the document was opened. */
+  const [turnedBy, setTurnedBy] = useState<number[]>([]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const ocr = useOcr();
   const pageOps = usePageOps();
@@ -67,6 +70,11 @@ export function App(): React.JSX.Element {
   // Split produces several documents where a page operation yields one, so the
   // parts are carried out of the operation through here.
   const splitParts = useRef<Uint8Array[]>([]);
+  // Rotation as the document was opened, so the panel can badge only what has
+  // been changed since. A page can carry /Rotate 90 and still display upright —
+  // plenty of scanners write that — and badging it "90°" tells the reader their
+  // page is sideways when it plainly is not.
+  const openedRotations = useRef<readonly number[]>([]);
 
   const engine = registry?.getEngine() ?? null;
 
@@ -91,8 +99,22 @@ export function App(): React.JSX.Element {
     // Page indices from the old document mean nothing in the new one.
     setSelected(new Set());
     setEditedSinceSave(edited);
+    // A freshly opened file becomes the baseline the rotation badges measure
+    // from; a document this app rewrote keeps the baseline it already had.
+    if (!edited) openedRotations.current = [];
     setDocument(next);
   }, []);
+
+  // The viewer's own Export command is a dead menu item inside the desktop
+  // app; this answers it there. Harmless in a browser, where it does nothing.
+  useEffect(() => {
+    if (!registry || !document) return;
+    return bridgeViewerExport(
+      registry,
+      () => document.name,
+      (message) => setSaveError(message),
+    );
+  }, [registry, document]);
 
   // Patch the form widgets the viewer draws wrong (max length, multiline font
   // size). Runs against the viewer's shadow root, and keeps running: widgets
@@ -124,12 +146,20 @@ export function App(): React.JSX.Element {
 
     void reading
       .then((next) => {
-        if (!cancelled) setRotations(next);
+        if (cancelled) return;
+        if (openedRotations.current.length === 0) openedRotations.current = next;
+
+        const baseline = openedRotations.current;
+        setRotations(next);
+        setTurnedBy(next.map((angle, index) => (((angle - (baseline[index] ?? 0)) % 360) + 360) % 360));
       })
       .catch(() => {
         // A document the viewer opened but pdf-lib cannot read is possible —
         // a damaged file it renders leniently — and the panel just stays empty.
-        if (!cancelled) setRotations([]);
+        if (!cancelled) {
+          setRotations([]);
+          setTurnedBy([]);
+        }
       });
 
     return () => {
@@ -428,6 +458,7 @@ export function App(): React.JSX.Element {
             onToggle={handleToggle}
             onSelectAll={() => setSelected(new Set(rotations.map((_unused, index) => index)))}
             onClearSelection={() => setSelected(new Set())}
+            turnedBy={turnedBy}
             thumbnails={thumbnails.thumbnails}
             thumbnailsStale={thumbnails.stale}
             onRotate={(degrees) => void runPageOp((bytes) => rotatePages(bytes, selectedPages, degrees))}

@@ -193,9 +193,27 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — After a drag, the selection follows the page to its new position. Leaving the tick on whatever
   slid into the old slot would be actively misleading.
 
+- 2026-08-31 — The rotation badge now shows how far a page has been turned *since the document was opened*,
+  not its stored `/Rotate`. Plenty of documents carry `/Rotate 90` on a page that displays perfectly upright —
+  scanners write it routinely — and badging that "90°" told the reader their page was sideways when it was not.
+- 2026-08-31 — The viewer's own Export is answered by this app when running under Tauri
+  (`src/lib/viewer/export-bridge.ts`). The viewer implements Export by clicking a hidden `<a download>`, which
+  a browser honours and the webview silently ignores, so Export was a dead menu item in the packaged app. The
+  bridge is deliberately *not* installed in a browser, where the viewer's own handler works and taking over as
+  well would download the document twice.
+- 2026-08-31 — `disabledCategories` does not remove `document-export`, `document-open` or `document-close` from
+  the viewer's document menu in 2.15.0, at the top level or under `ui`/`commands`. Tried and reverted; the
+  export bridge is the workaround.
+- 2026-08-31 — "Merge…" is now "Append…", with the hint line saying where the pages go. The old label did not
+  say whether the other document went before, after, or at the selection — it appends.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
 - File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
   the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
 - The desktop app is verified on Windows only; macOS and Linux are untried.
+- The viewer's document menu has its own **Open** and **Close**, which bypass this app's unsaved-changes
+  warning and leave its filename and page panel out of step with what the viewer is showing.
+  `disabledCategories` does not remove them. Not yet investigated: whether they actually work, and whether the
+  document-manager plugin offers a way to intercept them the way Export was intercepted.
