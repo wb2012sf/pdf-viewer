@@ -15,8 +15,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@embedpdf/core": "^2.15.0",
     "@embedpdf/default-stamps": "^0.0.1",
     "@embedpdf/pdfium": "^2.15.0",
+    "@embedpdf/plugin-export": "^2.15.0",
     "@embedpdf/plugin-stamp": "^2.15.0",
     "@embedpdf/react-pdf-viewer": "^2.15.0",
     "pdf-lib": "^1.17.1",

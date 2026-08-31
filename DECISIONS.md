@@ -84,6 +84,17 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — EmbedPDF paints pages into `<img>` elements inside its shadow root, not `<canvas>`. The scaffold's
   `canvas` locator could never have matched; e2e assertions use `embedpdf-container img`.
 
+- 2026-08-31 — **Bug found and fixed while testing stamp placement: Save discarded annotations.** The Save
+  button wrote the bytes the file was opened with, but anything drawn, stamped, highlighted or filled since
+  then lives in the viewer's state until flattened. A user could stamp a page, press Save, and get their
+  original file back with no warning. OCR had the same flaw, since it also read the opened bytes. Both now go
+  through `currentDocumentBytes`, which asks the viewer's export plugin for the document as it stands.
+- 2026-08-31 — `App` holds the `PluginRegistry` rather than just the engine, since both the engine and the
+  export capability come from it.
+- 2026-08-31 — The viewer labels its controls with `aria-label`, not `title`, and renders into a shadow root.
+  E2E tests locate controls by `aria-label` and click real screen coordinates: Playwright's actionability
+  checks cannot drive the component's internals (a `getByTitle(...).click()` simply times out).
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

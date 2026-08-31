@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { PDFViewer } from '@embedpdf/react-pdf-viewer';
-import type { PdfEngine } from '@embedpdf/models';
+import type { PluginRegistry } from '@embedpdf/core';
 import { OpenPdfButton } from './components/OpenPdfButton';
 import { OcrControls } from './components/OcrControls';
 import { useOcr } from './hooks/useOcr';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
+import { currentDocumentBytes } from './lib/viewer/current-document';
 
 interface OpenDocument {
   name: string;
@@ -23,8 +24,10 @@ function openDocumentFrom(name: string, bytes: Uint8Array): OpenDocument {
 
 export function App(): React.JSX.Element {
   const [document, setDocument] = useState<OpenDocument | null>(null);
-  const [engine, setEngine] = useState<PdfEngine | null>(null);
+  const [registry, setRegistry] = useState<PluginRegistry | null>(null);
   const ocr = useOcr();
+
+  const engine = registry?.getEngine() ?? null;
 
   // Object URLs pin the file in memory until revoked.
   useEffect(() => {
@@ -35,10 +38,10 @@ export function App(): React.JSX.Element {
   }, [document]);
 
   // Swapping the document remounts the viewer, which builds a fresh registry
-  // and engine. Dropping the old engine here keeps OCR from being handed a
+  // and engine. Dropping the old registry here keeps OCR from being handed a
   // reference that is about to be torn down; `onReady` supplies the new one.
   const replaceDocument = useCallback((next: OpenDocument): void => {
-    setEngine(null);
+    setRegistry(null);
     setDocument(next);
   }, []);
 
@@ -53,23 +56,36 @@ export function App(): React.JSX.Element {
   );
 
   const handleRunOcr = useCallback(async () => {
-    if (!engine || !document) return;
+    if (!registry || !engine || !document) return;
 
-    const searchable = await runOcr(engine, document.bytes);
+    // Read the document back out of the viewer first. Anything annotated since
+    // it was opened lives in the viewer's state, and OCRing the bytes the file
+    // arrived as would quietly discard it.
+    const current = await currentDocumentBytes(registry);
+    const searchable = await runOcr(engine, current);
     if (!searchable) return;
 
     // Reopen the viewer on the result so the new text layer is searchable at
     // once, rather than making the user save the file and open it again.
     replaceDocument(openDocumentFrom(document.name, searchable));
-  }, [engine, document, runOcr, replaceDocument]);
+  }, [registry, engine, document, runOcr, replaceDocument]);
 
-  const handleSave = useCallback(() => {
-    if (!document) return;
-    const link = window.document.createElement('a');
-    link.href = document.url;
-    link.download = document.name;
-    link.click();
-  }, [document]);
+  const handleSave = useCallback(async () => {
+    if (!document || !registry) return;
+
+    const bytes = await currentDocumentBytes(registry);
+    const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'application/pdf' }));
+    try {
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = document.name;
+      link.click();
+    } finally {
+      // The click has already handed the blob to the browser; holding the URL
+      // any longer just pins the bytes in memory.
+      URL.revokeObjectURL(url);
+    }
+  }, [document, registry]);
 
   return (
     <div className="workbench">
@@ -90,7 +106,13 @@ export function App(): React.JSX.Element {
               onRun={() => void handleRunOcr()}
               onCancel={ocr.cancel}
             />
-            <button type="button" className="workbench__button" onClick={handleSave} data-testid="save">
+            <button
+              type="button"
+              className="workbench__button"
+              onClick={() => void handleSave()}
+              disabled={registry === null}
+              data-testid="save"
+            >
               Save
             </button>
           </>
@@ -105,9 +127,7 @@ export function App(): React.JSX.Element {
             key={document.url}
             config={offlineViewerConfig(document.url)}
             style={{ width: '100%', height: '100%' }}
-            onReady={(registry) => {
-              setEngine(registry.getEngine());
-            }}
+            onReady={setRegistry}
           />
         ) : (
           <p className="workbench__empty" data-testid="empty-state">
