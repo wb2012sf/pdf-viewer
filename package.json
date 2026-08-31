@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@embedpdf/pdfium": "^2.15.0",
     "@embedpdf/react-pdf-viewer": "^2.15.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.8",

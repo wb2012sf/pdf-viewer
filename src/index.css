@@ -5,6 +5,7 @@
   --workbench-border: #d4d4d8;
   --workbench-panel: #ffffff;
   --workbench-accent: #2563eb;
+  --workbench-danger: #b91c1c;
 
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -18,6 +19,7 @@
     --workbench-border: #3f3f46;
     --workbench-panel: #27272a;
     --workbench-accent: #60a5fa;
+    --workbench-danger: #f87171;
   }
 }
 
@@ -91,6 +93,30 @@ body {
 .workbench__file-input:focus-visible + .workbench__button {
   outline: 2px solid var(--workbench-accent);
   outline-offset: 2px;
+}
+
+.workbench__ocr {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workbench__ocr-status {
+  font-size: 0.8125rem;
+  color: var(--workbench-muted);
+  /* OCR messages change length as they count up; a min-width stops the buttons
+     beside them jittering on every tick. */
+  min-width: 12rem;
+  text-align: right;
+}
+
+.workbench__ocr-status--error {
+  color: var(--workbench-danger);
+}
+
+.workbench__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .workbench__body {

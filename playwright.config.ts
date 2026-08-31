@@ -10,6 +10,11 @@ export default defineConfig({
   ...(process.env['CI'] ? { workers: 1 } : {}),
   reporter: [['list']],
   outputDir: './test-results',
+  // Booting PDFium means compiling a 4.6 MB WASM module before anything can be
+  // drawn, which takes tens of seconds on a headless CI-grade machine. The
+  // default 30s expires while the viewer is still legitimately starting up.
+  timeout: 120_000,
+  expect: { timeout: 30_000 },
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',

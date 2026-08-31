@@ -11,6 +11,12 @@
 export { recognizePages, toOcrPage } from './recognize';
 export type { PageImage, RecognizeOptions, TesseractBlockTree } from './recognize';
 
+export { OCR_RENDER_SCALE, renderPagesForOcr } from './render';
+export type { RenderOptions } from './render';
+
+export { makeSearchable } from './pipeline';
+export type { MakeSearchableOptions, OcrProgress, OcrStage, SearchableResult } from './pipeline';
+
 export { applyTextLayer, placeWord } from './text-layer';
 export type { Placement, TargetPage, TextLayerOptions, TextLayerReport } from './text-layer';
 

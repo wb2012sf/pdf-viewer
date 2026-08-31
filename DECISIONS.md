@@ -52,6 +52,28 @@ One line per assumption made instead of interrupting a session, newest last.
   transform and requiring the round trip to be exact. A `/Rotate` that is not a multiple of 90 is rejected
   rather than rounded, since no rounding of it could be right.
 
+- 2026-08-31 — Wiring OCR into the UI surfaced that the app was **not** actually offline: the packaged viewer
+  fetched PDFium's WASM, Open Sans, the signature dialog's cursive fonts and a stamp gallery from jsDelivr and
+  Google Fonts at runtime, despite the WASM also being bundled. `src/lib/viewer/offline-config.ts` disables all
+  four. The stamp gallery needed both `defaultLibrary: false` *and* `manifests: []`, as the snippet's built-in
+  manifest URL is a separate option; this costs the decorative gallery, not signature stamping.
+- 2026-08-31 — `wasmUrl` must be made absolute with `new URL(asset, location.href).href`. Vite emits asset URLs
+  relative to the page, the PDFium engine runs in a web worker, and a worker resolves a relative URL against
+  its own location — which is also inside `assets/`. The result was `assets/assets/…`, a 404, and a viewer that
+  hung forever without logging anything.
+- 2026-08-31 — OCR opens its own PDFium document handle rather than reusing the viewer's, and closes it in a
+  `finally`. The run must not disturb what the user is looking at, and these are native handles that leak.
+- 2026-08-31 — After OCR the viewer is reopened on the result, so the new text layer is searchable immediately
+  rather than after a save-and-reopen. The bytes handed to pdf-lib are the original ones, so the visible page
+  is never re-encoded through a PDFium round trip.
+- 2026-08-31 — Playwright's per-test timeout is 120s. Booting PDFium means compiling a 4.6 MB WASM module, which
+  takes tens of seconds headless; the 30s default expired while the viewer was still legitimately starting.
+- 2026-08-31 — The e2e offline check records requests rather than blocking them. Installing any `context.route`
+  handler stops the viewer resolving the `blob:` URL it is handed, so an enforced blackout failed for a reason
+  unrelated to OCR.
+- 2026-08-31 — EmbedPDF paints pages into `<img>` elements inside its shadow root, not `<canvas>`. The scaffold's
+  `canvas` locator could never have matched; e2e assertions use `embedpdf-container img`.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

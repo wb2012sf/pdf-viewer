@@ -60,9 +60,21 @@ Only the middle step needs a browser, so the part that decides where text lands 
 headlessly. Recognized words are written as PDF text render mode 3 — laid out and selectable, never painted —
 so the scan still looks like the scan.
 
+Open a PDF, press **Make searchable**, and the viewer reopens on the result once the text layer is written.
+**Save** writes the current document — including any OCR layer — back to disk.
+
 Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled through Vite, and
 `eng.traineddata` is served from `public/`. Adding a language means adding its `.traineddata` to
 `public/tessdata/`.
+
+## Staying offline
+
+The packaged viewer fetches four things from the internet by default — the PDFium WASM binary, its own UI
+font, the signature dialog's cursive fonts, and a stamp gallery. `src/lib/viewer/offline-config.ts` turns each
+of those off and points the engine at the bundled binary instead.
+
+This is enforced, not assumed: `tests/e2e/ocr.spec.ts` records every request the browser makes during a real
+OCR run and fails if any of them leaves the app's own origin.
 
 Rotated pages are handled. A recogniser only ever sees the page *as displayed*, so its boxes arrive with
 `/Rotate` already applied; `src/lib/ocr/rotation.ts` maps them back into the page's own coordinates and turns

@@ -19,9 +19,10 @@ test('renders a PDF picked from disk', async ({ page }) => {
   await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
   await expect(page.getByTestId('empty-state')).toHaveCount(0);
 
-  // PDFium renders each page to a canvas; waiting on one proves the WASM
-  // engine actually booted rather than the shell merely mounting.
-  await expect(page.locator('canvas').first()).toBeVisible({ timeout: 60_000 });
+  // EmbedPDF paints each page into an <img> inside its shadow root, so waiting
+  // for one proves the PDFium WASM engine actually booted and produced a
+  // bitmap, rather than the shell merely having mounted.
+  await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 
   await page.screenshot({ path: 'test-results/screenshots/document-open.png', fullPage: true });
 });
