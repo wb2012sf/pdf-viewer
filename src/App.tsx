@@ -24,6 +24,7 @@ import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
 import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
 import { bridgeViewerExport } from './lib/viewer/export-bridge';
+import { overrideDocumentCommands, type DocumentCommandHandlers } from './lib/viewer/document-commands';
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
 
 interface OpenDocument {
@@ -104,6 +105,19 @@ export function App(): React.JSX.Element {
     if (!edited) openedRotations.current = [];
     setDocument(next);
   }, []);
+
+  // The viewer's own Open and Close (and Ctrl+O / Ctrl+W) would otherwise walk
+  // straight past the unsaved-changes warning. Handlers are read from a ref so
+  // the commands, registered once, always run the current ones.
+  const documentCommands = useRef<DocumentCommandHandlers>({ onOpen: () => undefined, onClose: () => undefined });
+
+  useEffect(() => {
+    if (!registry) return;
+    overrideDocumentCommands(registry, {
+      onOpen: () => documentCommands.current.onOpen(),
+      onClose: () => documentCommands.current.onClose(),
+    });
+  }, [registry]);
 
   // The viewer's own Export command is a dead menu item inside the desktop
   // app; this answers it there. Harmless in a browser, where it does nothing.
@@ -343,6 +357,19 @@ export function App(): React.JSX.Element {
     },
     [document, hasUnsavedChanges],
   );
+
+  // Kept current for the viewer's commands, which were registered once and hold
+  // only the indirection above.
+  useEffect(() => {
+    documentCommands.current = {
+      onOpen: () => {
+        if (requestAction('open')) openPdfRef.current?.openPicker();
+      },
+      onClose: () => {
+        if (requestAction('close')) closeDocument();
+      },
+    };
+  }, [requestAction, closeDocument]);
 
   return (
     <div className="workbench">

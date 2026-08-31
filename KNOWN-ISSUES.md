@@ -96,8 +96,25 @@ taking over as well would save the document twice.
 
 `disabledCategories: ['document-export']` does not remove the menu item in
 2.15.0, at the top level or under `ui`/`commands`, so hiding it was not an
-option. The same applies to `document-open` and `document-close`, which is why
-the viewer's menu still offers its own Open and Close — see the open item below.
+option.
+
+### The viewer's own Open and Close bypassed the warning — patched here
+
+The viewer's document menu offers Open and Close, bound to Ctrl+O and Ctrl+W.
+Left alone they swap the document inside the viewer without this app hearing
+about it: no unsaved-changes warning, and a toolbar still naming a file that is
+no longer on screen.
+
+**Worked around** in `src/lib/viewer/document-commands.ts`, by re-registering
+`document:open` and `document:close` through the commands plugin at runtime so
+they run this app's handlers. That covers the shortcuts as well as the menu
+items — a warning that Ctrl+W walks past is not a warning.
+
+Two approaches that do *not* work, recorded so they are not tried again:
+supplying `commands` in the viewer config replaces the entire command set, after
+which the viewer fails to render at all because its UI refers to commands that
+no longer exist; and `onDocumentOpened`/`onDocumentClosed` only report
+afterwards, which is too late to ask the user anything.
 
 ### The dropdown arrow
 

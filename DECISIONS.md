@@ -207,13 +207,15 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — "Merge…" is now "Append…", with the hint line saying where the pages go. The old label did not
   say whether the other document went before, after, or at the selection — it appends.
 
+- 2026-08-31 — The viewer own Open and Close, and their Ctrl+O / Ctrl+W shortcuts, are re-registered at runtime
+  through the commands plugin so they run this app handlers (`src/lib/viewer/document-commands.ts`). They
+  previously walked straight past the unsaved-changes warning. Supplying `commands` in the viewer config
+  instead replaces the entire command set and the viewer then fails to render at all; the plugin capability
+  replaces a single command in place.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
 - File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
   the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
 - The desktop app is verified on Windows only; macOS and Linux are untried.
-- The viewer's document menu has its own **Open** and **Close**, which bypass this app's unsaved-changes
-  warning and leave its filename and page panel out of step with what the viewer is showing.
-  `disabledCategories` does not remove them. Not yet investigated: whether they actually work, and whether the
-  document-manager plugin offers a way to intercept them the way Export was intercepted.
