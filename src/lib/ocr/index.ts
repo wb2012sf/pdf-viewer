@@ -12,7 +12,10 @@ export { recognizePages, toOcrPage } from './recognize';
 export type { PageImage, RecognizeOptions, TesseractBlockTree } from './recognize';
 
 export { applyTextLayer, placeWord } from './text-layer';
-export type { TextLayerOptions, TextLayerReport } from './text-layer';
+export type { Placement, TargetPage, TextLayerOptions, TextLayerReport } from './text-layer';
+
+export { displayToUser, displayedSize, textDirection, toPageRotation } from './rotation';
+export type { PageRotation } from './rotation';
 
 export { toWinAnsi } from './win-ansi';
 export { DEFAULT_LANGUAGE, LANG_PATH, ocrAssetPaths } from './assets';

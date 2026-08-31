@@ -64,8 +64,10 @@ Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled th
 `eng.traineddata` is served from `public/`. Adding a language means adding its `.traineddata` to
 `public/tessdata/`.
 
-Known limitation: pages with a non-zero `/Rotate` are rejected rather than given a misaligned text layer. See
-`DECISIONS.md`.
+Rotated pages are handled. A recogniser only ever sees the page *as displayed*, so its boxes arrive with
+`/Rotate` already applied; `src/lib/ocr/rotation.ts` maps them back into the page's own coordinates and turns
+the glyphs to match, so the invisible text sits on the ink and reads along it. A `/Rotate` that is not a
+quarter turn is rejected rather than rounded.
 
 Regenerate the end-to-end fixture with `node tests/e2e/fixtures/make-fixture-pdf.mjs`.
 

@@ -16,6 +16,7 @@ import {
   type PDFPage,
 } from 'pdf-lib';
 import { PdfInputError, assertPdfBytes } from '../pdf/errors';
+import { displayToUser, displayedSize, textDirection, toPageRotation, type PageRotation } from './rotation';
 import { toWinAnsi } from './win-ansi';
 import type { OcrPage, OcrWord } from './types';
 
@@ -36,38 +37,52 @@ const DEFAULT_MIN_CONFIDENCE = 30;
 /** Nominal size the invisible text is laid out at before being squeezed to fit. */
 const LAYOUT_FONT_SIZE = 12;
 
-interface Placement {
-  x: number;
-  y: number;
+export interface Placement {
+  /** A PDF text matrix: `[a, b, c, d, e, f]`, rotation in the first four. */
+  matrix: readonly [number, number, number, number, number, number];
   fontSize: number;
   /** Horizontal scaling percentage (the PDF `Tz` operator). */
   squeeze: number;
   text: string;
 }
 
+/** The page a word is being placed on, in its own unrotated coordinates. */
+export interface TargetPage {
+  width: number;
+  height: number;
+  rotation: PageRotation;
+}
+
 /**
- * Maps one word from image pixel space onto an unrotated PDF page.
+ * Maps one word from image pixel space onto a page.
  *
- * Tesseract measures from the top-left of the image in pixels; PDF user space
- * runs from the bottom-left in points. The width of the glyphs is then squeezed
- * so the invisible word occupies exactly the box the visible ink occupies —
- * without that, selecting text drags a highlight that does not line up with
- * what the reader sees.
+ * Tesseract measures from the top-left of the *rendered* image in pixels, so
+ * its boxes are in display space — already rotated. The placement therefore
+ * goes: pixels → display points → user space, with the text matrix carrying the
+ * rotation so the invisible glyphs run along the same direction as the visible
+ * ink. On an unrotated page that rotation is the identity and this reduces to a
+ * scale and a y-flip.
+ *
+ * The glyph widths are then squeezed so the invisible word occupies exactly the
+ * box the visible ink occupies — without that, selecting text drags a highlight
+ * that does not line up with what the reader sees.
  *
  * Returns `null` when the word cannot contribute anything searchable.
  */
 export function placeWord(
   word: OcrWord,
-  page: { imageWidth: number; imageHeight: number },
-  pageWidth: number,
-  pageHeight: number,
+  image: { imageWidth: number; imageHeight: number },
+  page: TargetPage,
   font: PDFFont,
 ): Placement | null {
   const text = toWinAnsi(word.text).trim();
   if (text.length === 0) return null;
 
-  const scaleX = pageWidth / page.imageWidth;
-  const scaleY = pageHeight / page.imageHeight;
+  // The image is a picture of the *displayed* page, so pixels scale against the
+  // displayed size — which has its axes swapped on a quarter turn.
+  const display = displayedSize(page.width, page.height, page.rotation);
+  const scaleX = display.width / image.imageWidth;
+  const scaleY = display.height / image.imageHeight;
 
   const boxWidth = (word.bbox.x1 - word.bbox.x0) * scaleX;
   const boxHeight = (word.bbox.y1 - word.bbox.y0) * scaleY;
@@ -81,11 +96,19 @@ export function placeWord(
   const fontSize = boxHeight * 0.8;
   const widthAtFontSize = (naturalWidth / LAYOUT_FONT_SIZE) * fontSize;
 
+  // Baseline start, in display space: the left edge of the box, and y1 — the
+  // box's bottom in image space — once the y axis is flipped.
+  const origin = displayToUser(
+    word.bbox.x0 * scaleX,
+    display.height - word.bbox.y1 * scaleY,
+    page.width,
+    page.height,
+    page.rotation,
+  );
+  const { cos, sin } = textDirection(page.rotation);
+
   return {
-    x: word.bbox.x0 * scaleX,
-    // y1 is the bottom of the box in image space, which is the text baseline
-    // once the y axis is flipped.
-    y: pageHeight - word.bbox.y1 * scaleY,
+    matrix: [cos, sin, -sin, cos, origin.x, origin.y],
     fontSize,
     squeeze: (boxWidth / widthAtFontSize) * 100,
     text,
@@ -101,7 +124,7 @@ function drawInvisible(page: PDFPage, fontKey: PDFName, placement: Placement, fo
     setTextRenderingMode(TextRenderingMode.Invisible),
     setFontAndSize(fontKey, placement.fontSize),
     setCharacterSqueeze(placement.squeeze),
-    setTextMatrix(1, 0, 0, 1, placement.x, placement.y),
+    setTextMatrix(...placement.matrix),
     showText(font.encodeText(placement.text)),
     endText(),
     popGraphicsState(),
@@ -156,19 +179,11 @@ export async function applyTextLayer(
 
     const page = doc.getPage(ocrPage.pageIndex);
 
-    // A rotated page renders to an image whose axes no longer line up with user
-    // space, so every box would need transforming through the rotation. That is
-    // not implemented, and placing the text as if the page were upright would
-    // scatter it — better to say so than to write a layer that mislocates every
-    // word. Callers can rotate the page to 0 first.
-    const rotation = ((page.getRotation().angle % 360) + 360) % 360;
-    if (rotation !== 0) {
-      throw new PdfInputError(
-        `ocr: page ${String(ocrPage.pageIndex + 1)} is rotated ${String(rotation)}°; OCR currently supports unrotated pages only`,
-      );
-    }
-
+    // Tesseract read the page as displayed, so its boxes already have `/Rotate`
+    // baked in; `placeWord` transforms them back into user space.
     const { width, height } = page.getSize();
+    const target: TargetPage = { width, height, rotation: toPageRotation(page.getRotation().angle) };
+
     const fontKey = page.node.newFontDictionary(font.name, font.ref);
 
     for (const word of ocrPage.words) {
@@ -176,7 +191,7 @@ export async function applyTextLayer(
         wordsSkipped += 1;
         continue;
       }
-      const placement = placeWord(word, ocrPage, width, height, font);
+      const placement = placeWord(word, ocrPage, target, font);
       if (!placement) {
         wordsSkipped += 1;
         continue;

@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { applyTextLayer, placeWord } from './text-layer';
+import { PDFDocument, PDFName, StandardFonts } from 'pdf-lib';
+import { applyTextLayer, placeWord, type TargetPage } from './text-layer';
 import { PdfInputError } from '../pdf/errors';
 import { getPageCount } from '../pdf/page-ops';
+import { displayedSize, type PageRotation } from './rotation';
 import { makeEncryptedPdf, makePdf, pageContentStream } from '../../test/fixtures';
 import type { OcrPage, OcrWord } from './types';
 
 /** A page image twice the size of the fixture page, as a 144 DPI render would be. */
 const IMAGE = { imageWidth: 200, imageHeight: 400 };
+
+/** The fixture page `makePdf` produces, at its natural orientation. */
+const UPRIGHT: TargetPage = { width: 100, height: 200, rotation: 0 };
 
 function word(text: string, bbox: OcrWord['bbox'], confidence = 90): OcrWord {
   return { text, confidence, bbox };
@@ -32,24 +36,24 @@ describe('placeWord', () => {
     const font = await helvetica();
     // Image is 400px tall, page 200pt: a word in the top 10% of the image
     // belongs near y=180 on the page, not near y=20.
-    const placed = placeWord(word('Header', { x0: 0, y0: 0, x1: 100, y1: 40 }), IMAGE, 100, 200, font);
+    const placed = placeWord(word('Header', { x0: 0, y0: 0, x1: 100, y1: 40 }), IMAGE, UPRIGHT, font);
 
     expect(placed).not.toBeNull();
-    expect(placed?.y).toBeCloseTo(180, 5);
+    expect(placed?.matrix[5]).toBeCloseTo(180, 5);
   });
 
   it('scales x from image pixels into page points', async () => {
     const font = await helvetica();
-    const placed = placeWord(word('Word', { x0: 50, y0: 0, x1: 150, y1: 40 }), IMAGE, 100, 200, font);
+    const placed = placeWord(word('Word', { x0: 50, y0: 0, x1: 150, y1: 40 }), IMAGE, UPRIGHT, font);
 
     // 50px into a 200px-wide image is 25pt into a 100pt-wide page.
-    expect(placed?.x).toBeCloseTo(25, 5);
+    expect(placed?.matrix[4]).toBeCloseTo(25, 5);
   });
 
   it('squeezes the glyphs so the invisible word covers exactly the ink it stands for', async () => {
     const font = await helvetica();
     const box = { x0: 20, y0: 100, x1: 160, y1: 140 };
-    const placed = placeWord(word('Alignment', box), IMAGE, 100, 200, font);
+    const placed = placeWord(word('Alignment', box), IMAGE, UPRIGHT, font);
     expect(placed).not.toBeNull();
 
     // This is what makes a text selection line up with the scan underneath.
@@ -63,15 +67,87 @@ describe('placeWord', () => {
   it('skips a word with nothing searchable left after folding', async () => {
     const font = await helvetica();
 
-    expect(placeWord(word('   ', { x0: 0, y0: 0, x1: 10, y1: 10 }), IMAGE, 100, 200, font)).toBeNull();
-    expect(placeWord(word('日本語', { x0: 0, y0: 0, x1: 10, y1: 10 }), IMAGE, 100, 200, font)).toBeNull();
+    expect(placeWord(word('   ', { x0: 0, y0: 0, x1: 10, y1: 10 }), IMAGE, UPRIGHT, font)).toBeNull();
+    expect(placeWord(word('日本語', { x0: 0, y0: 0, x1: 10, y1: 10 }), IMAGE, UPRIGHT, font)).toBeNull();
   });
 
   it('skips a degenerate box', async () => {
     const font = await helvetica();
 
-    expect(placeWord(word('x', { x0: 10, y0: 10, x1: 10, y1: 20 }), IMAGE, 100, 200, font)).toBeNull();
-    expect(placeWord(word('x', { x0: 10, y0: 20, x1: 20, y1: 20 }), IMAGE, 100, 200, font)).toBeNull();
+    expect(placeWord(word('x', { x0: 10, y0: 10, x1: 10, y1: 20 }), IMAGE, UPRIGHT, font)).toBeNull();
+    expect(placeWord(word('x', { x0: 10, y0: 20, x1: 20, y1: 20 }), IMAGE, UPRIGHT, font)).toBeNull();
+  });
+});
+
+/**
+ * User space → display space, written here independently of the inverse the
+ * module uses, so these tests check the composition rather than restate it.
+ */
+function toDisplay(
+  x: number,
+  y: number,
+  pageWidth: number,
+  pageHeight: number,
+  rotation: PageRotation,
+): { x: number; y: number } {
+  switch (rotation) {
+    case 90:
+      return { x: y, y: pageWidth - x };
+    case 180:
+      return { x: pageWidth - x, y: pageHeight - y };
+    case 270:
+      return { x: pageHeight - y, y: x };
+    default:
+      return { x, y };
+  }
+}
+
+describe.each([0, 90, 180, 270] as PageRotation[])('placeWord on a page rotated %i°', (rotation) => {
+  const page: TargetPage = { width: 100, height: 200, rotation };
+  const display = displayedSize(page.width, page.height, rotation);
+  // A render of the page as displayed, at 2x, which is the only image a
+  // recogniser ever sees.
+  const image = { imageWidth: display.width * 2, imageHeight: display.height * 2 };
+  const box = { x0: 20, y0: 30, x1: 140, y1: 70 };
+  const expected = { x0: box.x0 / 2, x1: box.x1 / 2, baseline: display.height - box.y1 / 2 };
+
+  it('starts the baseline exactly where the ink starts', async () => {
+    const font = await helvetica();
+    const placed = placeWord(word('Aligned', box), image, page, font);
+    expect(placed).not.toBeNull();
+
+    // Map the placement back out to display space: it has to land on the box
+    // Tesseract reported, whatever the page rotation did in between.
+    const [, , , , e, f] = placed!.matrix;
+    const start = toDisplay(e, f, page.width, page.height, rotation);
+
+    expect(start.x).toBeCloseTo(expected.x0, 6);
+    expect(start.y).toBeCloseTo(expected.baseline, 6);
+  });
+
+  it('runs the glyphs along the ink and ends where it ends', async () => {
+    const font = await helvetica();
+    const placed = placeWord(word('Aligned', box), image, page, font);
+    const [a, b, , , e, f] = placed!.matrix;
+
+    // Stepping the width of the box along the text direction must arrive at the
+    // far end of the box — this is what proves the text is not merely in the
+    // right place but facing the right way.
+    const width = (box.x1 - box.x0) / 2;
+    const end = toDisplay(e + a * width, f + b * width, page.width, page.height, rotation);
+
+    expect(end.x).toBeCloseTo(expected.x1, 6);
+    expect(end.y).toBeCloseTo(expected.baseline, 6);
+  });
+
+  it('keeps the baseline inside the page', async () => {
+    const font = await helvetica();
+    const [, , , , e, f] = placeWord(word('Aligned', box), image, page, font)!.matrix;
+
+    expect(e).toBeGreaterThanOrEqual(0);
+    expect(e).toBeLessThanOrEqual(page.width);
+    expect(f).toBeGreaterThanOrEqual(0);
+    expect(f).toBeLessThanOrEqual(page.height);
   });
 });
 
@@ -175,15 +251,26 @@ describe('applyTextLayer', () => {
     );
   });
 
-  it('refuses a rotated page rather than scattering the text across it', async () => {
-    // The rendered image of a rotated page no longer shares axes with user
-    // space, so every box would land in the wrong place. Failing is honest;
-    // writing a misaligned layer would not be.
-    const rotated = await makePdf(1, { rotation: 90 });
+  it.each([0, 90, 180, 270] as PageRotation[])('writes a text layer onto a page rotated %i°', async (rotation) => {
+    const { pdf, wordsAdded } = await applyTextLayer(await makePdf(1, { rotation }), [
+      ocrPage([word('Rotated', { x0: 10, y0: 10, x1: 120, y1: 40 })]),
+    ]);
 
-    await expect(applyTextLayer(rotated, [ocrPage([word('x', { x0: 0, y0: 0, x1: 5, y1: 5 })])])).rejects.toThrow(
-      /rotated 90°/,
-    );
+    expect(wordsAdded).toBe(1);
+    expect(await pageContentStream(pdf, 0)).toContain(hex('Rotated'));
+  });
+
+  it('rejects a page whose /Rotate is not a quarter turn', async () => {
+    // pdf-lib refuses to *write* an angle like this, so the fixture sets the raw
+    // dictionary entry — a file produced by other software can carry one, and
+    // rounding it into a plausible-looking text layer would misplace every word.
+    const doc = await PDFDocument.load(await makePdf(1));
+    doc.getPage(0).node.set(PDFName.of('Rotate'), doc.context.obj(45));
+    const malformed = await doc.save();
+
+    await expect(
+      applyTextLayer(malformed, [ocrPage([word('x', { x0: 0, y0: 0, x1: 5, y1: 5 })])]),
+    ).rejects.toThrow(/multiple of 90/);
   });
 
   it('rejects non-PDF input at the boundary', async () => {

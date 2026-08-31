@@ -46,12 +46,12 @@ One line per assumption made instead of interrupting a session, newest last.
   anything else dropped). The standard PDF fonts cannot encode arbitrary Unicode and pdf-lib throws on the
   first bad character, which would lose the whole word.
 
-## Open items
+- 2026-08-31 — OCR now handles rotated pages (`src/lib/ocr/rotation.ts`), closing the open item raised earlier
+  the same day. The geometry is anchored on four corner facts that are checkable by turning a sheet of paper,
+  not by algebra; the algebra is then checked separately by composing it with an independently written forward
+  transform and requiring the round trip to be exact. A `/Rotate` that is not a multiple of 90 is rejected
+  rather than rounded, since no rounding of it could be right.
 
-- **OCR does not support rotated pages.** `applyTextLayer` throws on any page with a non-zero `/Rotate`. The
-  rendered image of a rotated page no longer shares axes with user space, so every word box needs transforming
-  through the rotation; writing that without being able to check the result visually risked a layer that
-  mislocates every word. Since this tool can itself rotate pages, this will need doing — the fix is a
-  per-rotation affine transform in `placeWord`, verified against a rendered page.
+## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
