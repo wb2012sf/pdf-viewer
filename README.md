@@ -38,9 +38,34 @@ src/
   lib/pdf/                 Page operations on real PDF bytes (pdf-lib)
     page-ops.ts            merge / extract / reorder / split / rotate
     errors.ts              Boundary validation for untrusted input
+  lib/ocr/                 Scanned page -> searchable PDF
+    recognize.ts           Tesseract worker; browser only
+    text-layer.ts          Invisible searchable text via pdf-lib
+    win-ansi.ts            Folds OCR output into what standard fonts encode
+    assets.ts              Bundled worker/core/traineddata paths
   test/fixtures.ts         Builds identifiable PDFs for tests
+public/tessdata/           eng.traineddata, bundled so OCR works offline
 tests/e2e/                 Playwright specs + fixture PDF
 ```
+
+## OCR
+
+Three steps, deliberately separable:
+
+```
+render (caller, PDFium) -> recognizePages (Tesseract) -> applyTextLayer (pdf-lib)
+```
+
+Only the middle step needs a browser, so the part that decides where text lands on the page is unit-tested
+headlessly. Recognized words are written as PDF text render mode 3 — laid out and selectable, never painted —
+so the scan still looks like the scan.
+
+Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled through Vite, and
+`eng.traineddata` is served from `public/`. Adding a language means adding its `.traineddata` to
+`public/tessdata/`.
+
+Known limitation: pages with a non-zero `/Rotate` are rejected rather than given a misaligned text layer. See
+`DECISIONS.md`.
 
 Regenerate the end-to-end fixture with `node tests/e2e/fixtures/make-fixture-pdf.mjs`.
 

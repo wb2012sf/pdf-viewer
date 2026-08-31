@@ -28,6 +28,30 @@ One line per assumption made instead of interrupting a session, newest last.
   another library. CLAUDE.md's scope and "out of scope" sections were updated to match. Reading an already-
   encrypted file is unaffected — it still fails loudly.
 
+- 2026-08-31 — OCR is split into `recognize` (Tesseract, browser-only) and `applyTextLayer` (pdf-lib,
+  environment-agnostic), with rendering left to the caller. That keeps the part that decides where text lands
+  on the page testable headlessly; only the thin worker wrapper needs a browser.
+- 2026-08-31 — Bundled `eng.traineddata` from tessdata_fast (4.1 MB, committed to the repo) rather than
+  tessdata_best (~12 MB). CLAUDE.md already accepts lower recognition quality than ocrmypdf in exchange for
+  zero runtime dependencies; this is the same trade at a quarter of the download.
+- 2026-08-31 — The traineddata lives in `public/tessdata/` rather than being imported through Vite, because
+  Tesseract builds its own URL as `${langPath}/${lang}.traineddata` and cannot cope with a hashed filename.
+  The worker and WASM core *are* imported with `?url`, so they cannot drift from the installed version.
+- 2026-08-31 — `corePath` names `tesseract-core-simd-lstm.wasm.js` directly, which skips Tesseract's SIMD
+  feature detection and commits to a WASM SIMD build. The alternative was bundling six core variants.
+- 2026-08-31 — Invisible text is placed with PDF render mode 3 plus a horizontal squeeze (`Tz`) per word, so a
+  text selection lines up with the ink in the scan underneath. Words below 30% confidence are dropped by
+  default: a wrong word makes search match a page that does not contain the term, which is worse than a miss.
+- 2026-08-31 — Text is folded into WinAnsi before encoding (ligatures expanded, smart punctuation flattened,
+  anything else dropped). The standard PDF fonts cannot encode arbitrary Unicode and pdf-lib throws on the
+  first bad character, which would lose the whole word.
+
 ## Open items
+
+- **OCR does not support rotated pages.** `applyTextLayer` throws on any page with a non-zero `/Rotate`. The
+  rendered image of a rotated page no longer shares axes with user space, so every word box needs transforming
+  through the rotation; writing that without being able to check the result visually risked a layer that
+  mislocates every word. Since this tool can itself rotate pages, this will need doing — the fix is a
+  per-rotation affine transform in `placeWord`, verified against a rendered page.
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

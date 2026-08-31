@@ -1,4 +1,12 @@
-import { PDFDocument, PDFHexString, StandardFonts, degrees } from 'pdf-lib';
+import {
+  PDFArray,
+  PDFDocument,
+  PDFHexString,
+  PDFRawStream,
+  StandardFonts,
+  decodePDFRawStream,
+  degrees,
+} from 'pdf-lib';
 
 /**
  * Builds an in-memory PDF whose pages are individually identifiable.
@@ -77,4 +85,27 @@ export async function pageWidths(bytes: Uint8Array): Promise<number[]> {
 /** Original fixture page indices, recovered from page widths. */
 export async function pageOrder(bytes: Uint8Array): Promise<number[]> {
   return (await pageWidths(bytes)).map((width) => width - PAGE_WIDTH_BASE);
+}
+
+/**
+ * Decompresses a page's content stream back to PDF operators.
+ *
+ * This is how a test can assert what was actually written into the file —
+ * that text really carries render mode 3, that the glyphs really are the ones
+ * expected — rather than trusting the function that wrote it.
+ */
+export async function pageContentStream(bytes: Uint8Array, pageIndex: number): Promise<string> {
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const contents = doc.getPage(pageIndex).node.Contents();
+  if (!contents) return '';
+
+  const context = doc.context;
+  const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => context.lookup(ref)) : [contents];
+
+  // latin1 keeps every byte as one character, so hex strings and operator names
+  // survive intact even where the stream holds arbitrary binary.
+  const decoder = new TextDecoder('latin1');
+  return streams
+    .map((stream) => (stream instanceof PDFRawStream ? decoder.decode(decodePDFRawStream(stream).decode()) : ''))
+    .join('\n');
 }
