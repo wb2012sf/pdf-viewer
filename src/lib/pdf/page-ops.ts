@@ -7,8 +7,9 @@ export type Rotation = 0 | 90 | 180 | 270;
 /**
  * Loads a PDF for structural editing.
  *
- * `ignoreEncryption` is deliberately off: a password-protected file must fail
- * loudly here rather than silently producing a broken copy.
+ * `ignoreEncryption` is deliberately off. Encrypting and decrypting PDFs is out
+ * of scope (see CLAUDE.md), so this tool has no way to unlock a protected file
+ * — it must fail loudly here rather than silently producing a broken copy.
  */
 async function load(bytes: Uint8Array, label: string): Promise<PDFDocument> {
   assertPdfBytes(bytes, label);

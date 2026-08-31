@@ -10,14 +10,14 @@ Last reviewed: 2026-08-30. Update this file whenever a decision below changes; d
 
 ## Purpose
 
-A cross-platform tool that replicates the PDF functionality of macOS Preview: view, search, annotate (highlight, note, freehand, shapes), fill existing form fields, stamp a signature image, merge/split/reorder/rotate/extract pages, encrypt/decrypt, and OCR scanned pages into searchable text. It is not an Acrobat replacement and should not grow toward reflowable text editing, forms design, or certificate-based signing unless a future decision explicitly says otherwise.
+A cross-platform tool that replicates the PDF functionality of macOS Preview: view, search, annotate (highlight, note, freehand, shapes), fill existing form fields, stamp a signature image, merge/split/reorder/rotate/extract pages, and OCR scanned pages into searchable text. It is not an Acrobat replacement and should not grow toward reflowable text editing, forms design, or certificate-based signing unless a future decision explicitly says otherwise.
 
 **No Docker, anywhere, and no required server.** The app must run for someone who has only downloaded or been handed it, with nothing else installed, not Docker, not a VPS, not a separate backend. This is a hard constraint, not a preference: it changed the OCR approach (see Stack) and rules out Docker Compose as the deployment model entirely, superseding the earlier VPS/WSL-Compose framing.
 
 ## Stack (decided — do not re-litigate without being asked)
 
 - Frontend: TypeScript, React, PDFium rendering via EmbedPDF (client-side WASM; runs entirely in the browser/webview, not on a server).
-- Page operations (merge/split/rotate/extract/encrypt): pdf-lib, pure TS. Runs client-side; it has no Node-only dependency forcing a backend.
+- Page operations (merge/split/rotate/extract): pdf-lib, pure TS. Runs client-side; it has no Node-only dependency forcing a backend.
 - OCR: Tesseract.js (WASM), running client-side alongside PDFium — not ocrmypdf, not Docker, no server-side OCR service. Recognized text is merged back into the PDF as an invisible searchable layer using pdf-lib, built as project code rather than reused from ocrmypdf's pipeline, since ocrmypdf itself only works via Docker or a Python/Ghostscript/qpdf install, exactly what's being avoided. Bundle the language trained-data file(s) (English at minimum) with the app so OCR works fully offline, not fetched at runtime. Accepted tradeoff: lower recognition/deskew quality than ocrmypdf's pipeline, in exchange for zero external runtime dependencies.
 - Architecture consequence: with OCR now client-side too, nothing in the current feature scope requires a backend at all. The built output can be a static bundle (viewing, annotation, page manipulation, and OCR all run in the browser/webview). Do not add a Node/Express-style backend "just in case" — if a feature genuinely needs one later, that's a decision to make explicitly, not a default.
 - Distribution model: **decided — Tauri-packaged native installer.** Friends download and run a real installer (.exe on Windows, .dmg on Mac, .AppImage/.deb on Linux), fully offline, nothing else to install. No hosted-site path needed; do not build server/hosting infrastructure for distribution. Tauri wraps the same TypeScript/React frontend in a native webview, so this is additive to the frontend work, not a rewrite. Known open item, not yet resolved: an unsigned installer triggers Windows SmartScreen and macOS Gatekeeper warnings on first run; decide later whether code-signing is worth it for a friends-and-family tool or whether "click through the warning once" is acceptable.
@@ -85,6 +85,7 @@ Development happens headless, on the Linux VPS or locally in WSL, with no displa
 
 ## Out of scope, do not build unless explicitly asked
 
+- Setting, changing, or removing a PDF password (encryption/decryption). **Dropped from scope on 2026-08-31**, having previously been listed as in scope. pdf-lib cannot encrypt or decrypt, and PDFium's password support is read-side only, so there was no implementation path that did not mean adopting another library. Opening an already-encrypted file still fails loudly rather than silently producing a broken copy (see `src/lib/pdf/page-ops.ts`). Note that the "stop and ask" rule above still covers encryption/password handling: reintroducing this is a decision, not a refactor.
 - Reflowable in-place text editing of arbitrary PDF content.
 - A forms design/authoring tool.
 - Certificate-based, legally binding e-signatures.

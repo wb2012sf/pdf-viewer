@@ -20,9 +20,11 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — Scaffold only: no OCR module and no Tauri shell yet. `tesseract.js` is installed so the
   dependency decision is recorded, but no stub code was written for unbuilt features.
 
+- 2026-08-31 — Encrypt/decrypt dropped from scope (user decision, not an assumption). pdf-lib cannot encrypt
+  or decrypt and PDFium's password support is read-side only, so there was no path that did not mean adopting
+  another library. CLAUDE.md's scope and "out of scope" sections were updated to match. Reading an already-
+  encrypted file is unaffected — it still fails loudly.
+
 ## Open items
 
-- **Encryption/decryption has no implementation path yet.** CLAUDE.md lists encrypt/decrypt in scope, but
-  pdf-lib cannot encrypt or decrypt, and PDFium's password support is read-side only. Setting a password on
-  a saved PDF will need a different library or a decision to drop the feature. Not resolved here.
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
