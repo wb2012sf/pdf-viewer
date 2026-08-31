@@ -82,6 +82,51 @@ export async function extractPages(bytes: Uint8Array, pageIndices: readonly numb
 }
 
 /**
+ * Produces a new document without `pageIndices`, keeping the rest in order.
+ *
+ * Removing every page would leave a file no reader will open, so that is
+ * refused rather than written.
+ */
+export async function removePages(bytes: Uint8Array, pageIndices: readonly number[]): Promise<Uint8Array> {
+  const source = await load(bytes, 'document');
+  const pageCount = source.getPageCount();
+  assertPageIndices(pageIndices, pageCount, 'remove');
+
+  const removed = new Set(pageIndices);
+  const kept = Array.from({ length: pageCount }, (_unused, index) => index).filter(
+    (index) => !removed.has(index),
+  );
+
+  if (kept.length === 0) {
+    throw new PdfInputError('remove: a document must keep at least one page');
+  }
+  return extractPages(bytes, kept);
+}
+
+/**
+ * The page order that results from dragging the page at `from` to sit at `to`.
+ *
+ * Pure index arithmetic, kept here so the UI never hand-rolls a permutation and
+ * risks handing `reorderPages` something that drops a page.
+ */
+export function orderWithPageMoved(pageCount: number, from: number, to: number): number[] {
+  if (!Number.isInteger(pageCount) || pageCount < 1) {
+    throw new PdfInputError(`move: a document must have at least one page, got ${String(pageCount)}`);
+  }
+  if (!Number.isInteger(from) || from < 0 || from >= pageCount) {
+    throw new PdfInputError(`move: page ${String(from)} is out of range`);
+  }
+  if (!Number.isInteger(to) || to < 0 || to >= pageCount) {
+    throw new PdfInputError(`move: target position ${String(to)} is out of range`);
+  }
+
+  const order = Array.from({ length: pageCount }, (_unused, index) => index);
+  const [moved] = order.splice(from, 1);
+  order.splice(to, 0, moved!);
+  return order;
+}
+
+/**
  * Rewrites the page order. `order` must be a permutation of every page index,
  * so that reordering can never silently drop a page.
  */

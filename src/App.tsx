@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 import type { PluginRegistry } from '@embedpdf/core';
 import { OpenPdfButton } from './components/OpenPdfButton';
 import { OcrControls } from './components/OcrControls';
+import { PagePanel } from './components/PagePanel';
 import { useOcr } from './hooks/useOcr';
+import { usePageOps, type PageOperation } from './hooks/usePageOps';
+import {
+  extractPages,
+  getPageRotations,
+  mergePdfs,
+  orderWithPageMoved,
+  removePages,
+  reorderPages,
+  rotatePages,
+} from './lib/pdf/page-ops';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
@@ -27,7 +38,12 @@ export function App(): React.JSX.Element {
   const [document, setDocument] = useState<OpenDocument | null>(null);
   const [registry, setRegistry] = useState<PluginRegistry | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pagesOpen, setPagesOpen] = useState(false);
+  const [rotations, setRotations] = useState<number[]>([]);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const ocr = useOcr();
+  const pageOps = usePageOps();
+  const mergeInputRef = useRef<HTMLInputElement>(null);
 
   const engine = registry?.getEngine() ?? null;
 
@@ -45,8 +61,31 @@ export function App(): React.JSX.Element {
   const replaceDocument = useCallback((next: OpenDocument): void => {
     setRegistry(null);
     setSaveError(null);
+    // Page indices from the old document mean nothing in the new one.
+    setSelected(new Set());
     setDocument(next);
   }, []);
+
+  // The panel lists pages by their stored rotation, which is read from the
+  // bytes rather than the viewer so it stays right after every operation.
+  useEffect(() => {
+    let cancelled = false;
+    const reading = document ? getPageRotations(document.bytes) : Promise.resolve<number[]>([]);
+
+    void reading
+      .then((next) => {
+        if (!cancelled) setRotations(next);
+      })
+      .catch(() => {
+        // A document the viewer opened but pdf-lib cannot read is possible —
+        // a damaged file it renders leniently — and the panel just stays empty.
+        if (!cancelled) setRotations([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [document]);
 
   const { reset: resetOcr, run: runOcr } = ocr;
 
@@ -72,6 +111,53 @@ export function App(): React.JSX.Element {
     // once, rather than making the user save the file and open it again.
     replaceDocument(openDocumentFrom(document.name, searchable));
   }, [registry, engine, document, runOcr, replaceDocument]);
+
+  const { apply: applyPageOp } = pageOps;
+
+  /** Runs a page operation and reopens the viewer on the result. */
+  const runPageOp = useCallback(
+    async (operation: PageOperation) => {
+      if (!registry || !document) return;
+
+      const next = await applyPageOp(registry, operation);
+      if (!next) return;
+      replaceDocument(openDocumentFrom(document.name, next));
+    },
+    [registry, document, applyPageOp, replaceDocument],
+  );
+
+  const selectedPages = useMemo(() => [...selected].sort((a, b) => a - b), [selected]);
+
+  const handleToggle = useCallback((pageIndex: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(pageIndex)) next.add(pageIndex);
+      return next;
+    });
+  }, []);
+
+  const handleExtract = useCallback(async () => {
+    if (!registry || !document) return;
+
+    // Extract writes a *new* file rather than replacing what is open — pulling
+    // pages out is usually about producing something alongside the original.
+    const extracted = await applyPageOp(registry, (bytes) => extractPages(bytes, selectedPages));
+    if (!extracted) return;
+
+    try {
+      await saveFile(extracted, `${document.name.replace(/\.pdf$/i, '')}-pages.pdf`);
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, [registry, document, applyPageOp, selectedPages]);
+
+  const handleMerge = useCallback(
+    async (file: File) => {
+      const appended = new Uint8Array(await file.arrayBuffer());
+      await runPageOp((bytes) => mergePdfs([bytes, appended]));
+    },
+    [runPageOp],
+  );
 
   const handleSave = useCallback(async () => {
     if (!document || !registry) return;
@@ -125,6 +211,15 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="workbench__button"
+              onClick={() => setPagesOpen((open) => !open)}
+              aria-pressed={pagesOpen}
+              data-testid="toggle-pages"
+            >
+              Pages
+            </button>
+            <button
+              type="button"
+              className="workbench__button"
               onClick={() => void handleSave()}
               disabled={registry === null}
               data-testid="save"
@@ -137,14 +232,54 @@ export function App(): React.JSX.Element {
         <OpenPdfButton onOpen={(file) => void handleOpen(file)} />
       </header>
 
+      {/* Off-screen: merging needs a second document, and the panel's button
+          drives this rather than showing a second file control in the toolbar. */}
+      <input
+        ref={mergeInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="workbench__file-input"
+        data-testid="merge-input"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) void handleMerge(file);
+        }}
+      />
+
       <main className="workbench__body">
-        {document ? (
-          <PDFViewer
-            key={document.url}
-            config={offlineViewerConfig(document.url)}
-            style={{ width: '100%', height: '100%' }}
-            onReady={setRegistry}
+        {document && pagesOpen && (
+          <PagePanel
+            rotations={rotations}
+            selected={selected}
+            busy={pageOps.busy}
+            error={pageOps.error}
+            onToggle={handleToggle}
+            onSelectAll={() => setSelected(new Set(rotations.map((_unused, index) => index)))}
+            onClearSelection={() => setSelected(new Set())}
+            onRotate={(degrees) => void runPageOp((bytes) => rotatePages(bytes, selectedPages, degrees))}
+            onDelete={() => void runPageOp((bytes) => removePages(bytes, selectedPages))}
+            onMove={(direction) =>
+              void runPageOp((bytes) => {
+                const from = selectedPages[0]!;
+                return reorderPages(bytes, orderWithPageMoved(rotations.length, from, from + direction));
+              })
+            }
+            onExtract={() => void handleExtract()}
+            onMerge={() => mergeInputRef.current?.click()}
+            onClose={() => setPagesOpen(false)}
           />
+        )}
+
+        {document ? (
+          <div className="workbench__viewer">
+            <PDFViewer
+              key={document.url}
+              config={offlineViewerConfig(document.url)}
+              style={{ width: '100%', height: '100%' }}
+              onReady={setRegistry}
+            />
+          </div>
         ) : (
           <p className="workbench__empty" data-testid="empty-state">
             Open a PDF to get started. Everything runs on this machine — nothing is uploaded.

@@ -117,6 +117,19 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — The app icon is a placeholder (`src-tauri/app-icon.svg`); replace before giving the installer to
   anyone.
 
+- 2026-08-31 — Page operations are wired into the UI (`PagePanel` + `usePageOps`). They read through
+  `currentDocumentBytes` like Save and OCR, so annotations made before a reorder survive it — covered by an
+  end-to-end test that stamps a page, rotates it, saves, and checks the annotation is still there.
+- 2026-08-31 — Operations act only on ticked pages, and the buttons stay disabled until something is ticked.
+  Rotating the whole document because nothing was selected is far more likely to be a mis-click than intent.
+- 2026-08-31 — Moving is limited to a single selected page: "move these three up" has no obvious meaning when
+  they are not adjacent. Deleting every page is refused in the UI as well as the library.
+- 2026-08-31 — Extract writes a separate file rather than replacing what is open, since pulling pages out is
+  normally about producing something alongside the original.
+- 2026-08-31 — `orderWithPageMoved` lives in `page-ops.ts` rather than the panel, so the UI never hand-rolls a
+  permutation; a property test checks every from/to pair still yields a full permutation, which is what
+  `reorderPages` demands.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

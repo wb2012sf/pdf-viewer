@@ -4,6 +4,8 @@ import {
   getPageCount,
   getPageRotations,
   mergePdfs,
+  orderWithPageMoved,
+  removePages,
   reorderPages,
   rotatePages,
   splitPdf,
@@ -138,6 +140,60 @@ describe('encrypted documents', () => {
   it('leaves unencrypted documents unaffected', async () => {
     // Guards against a refusal so broad it starts rejecting ordinary files.
     expect(await getPageCount(await makePdf(2))).toBe(2);
+  });
+});
+
+describe('removePages', () => {
+  it('drops the named pages and keeps the rest in order', async () => {
+    expect(await pageOrder(await removePages(await makePdf(5), [1, 3]))).toEqual([0, 2, 4]);
+  });
+
+  it('tolerates the same page being named twice', async () => {
+    expect(await pageOrder(await removePages(await makePdf(3), [1, 1]))).toEqual([0, 2]);
+  });
+
+  it('refuses to empty the document', async () => {
+    // A zero-page PDF is a file no reader will open.
+    await expect(removePages(await makePdf(2), [0, 1])).rejects.toThrow(/at least one page/);
+  });
+
+  it('rejects a page it does not have', async () => {
+    await expect(removePages(await makePdf(2), [9])).rejects.toThrow(/out of range/);
+  });
+});
+
+describe('orderWithPageMoved', () => {
+  it('moves a page later, sliding the others up', () => {
+    expect(orderWithPageMoved(5, 1, 3)).toEqual([0, 2, 3, 1, 4]);
+  });
+
+  it('moves a page earlier', () => {
+    expect(orderWithPageMoved(5, 3, 1)).toEqual([0, 3, 1, 2, 4]);
+  });
+
+  it('leaves the order alone when a page is moved onto itself', () => {
+    expect(orderWithPageMoved(4, 2, 2)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('always returns a full permutation', () => {
+    // This feeds `reorderPages`, which rejects anything that would drop a page —
+    // so the arithmetic here must never produce one.
+    for (let from = 0; from < 6; from += 1) {
+      for (let to = 0; to < 6; to += 1) {
+        expect([...orderWithPageMoved(6, from, to)].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5]);
+      }
+    }
+  });
+
+  it('rejects an out-of-range move', () => {
+    expect(() => orderWithPageMoved(3, 5, 0)).toThrow(/out of range/);
+    expect(() => orderWithPageMoved(3, 0, 7)).toThrow(/out of range/);
+  });
+
+  it('produces an order reorderPages accepts', async () => {
+    const moved = await reorderPages(await makePdf(4), orderWithPageMoved(4, 0, 3));
+
+    expect(await pageOrder(moved)).toEqual([1, 2, 3, 0]);
   });
 });
 

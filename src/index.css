@@ -119,15 +119,113 @@ body {
   cursor: not-allowed;
 }
 
+.pages {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 15rem;
+  align-self: stretch;
+  min-height: 0;
+  background: var(--workbench-panel);
+  border-right: 1px solid var(--workbench-border);
+}
+
+.pages__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--workbench-border);
+}
+
+.pages__title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.pages__close {
+  border: 0;
+  background: none;
+  color: var(--workbench-muted);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pages__actions {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.pages__actions button {
+  flex: 1;
+  padding: 0.3125rem 0.375rem;
+  border: 1px solid var(--workbench-border);
+  border-radius: 0.375rem;
+  background: var(--workbench-bg);
+  color: var(--workbench-fg);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.pages__actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pages__error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: var(--workbench-danger);
+  font-size: 0.8125rem;
+}
+
+.pages__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.pages__item label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3125rem 0.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.pages__item label:hover {
+  background: var(--workbench-bg);
+}
+
+.pages__number {
+  flex: 1;
+}
+
+.pages__rotation {
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+}
+
 .workbench__body {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+}
+
+/* The viewer takes whatever the pages panel leaves. `min-width: 0` stops a wide
+   document forcing the panel off-screen. */
+.workbench__viewer {
+  flex: 1;
+  min-width: 0;
 }
 
 .workbench__empty {
+  margin: auto;
   max-width: 28rem;
   padding: 0 1rem;
   text-align: center;

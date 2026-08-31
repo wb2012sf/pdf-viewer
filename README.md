@@ -48,8 +48,10 @@ and where the two likely failures (CSP and plugin permissions) would show up.
 src/
   App.tsx                  Shell: open a file, hand it to the viewer
   components/              UI pieces, each with a co-located .test.tsx
+  components/PagePanel.tsx Page list: rotate / reorder / delete / extract / merge
+  hooks/                   useOcr, usePageOps
   lib/pdf/                 Page operations on real PDF bytes (pdf-lib)
-    page-ops.ts            merge / extract / reorder / split / rotate
+    page-ops.ts            merge / extract / reorder / split / rotate / remove
     errors.ts              Boundary validation for untrusted input
   lib/ocr/                 Scanned page -> searchable PDF
     recognize.ts           Tesseract worker; browser only
@@ -60,6 +62,16 @@ src/
 public/tessdata/           eng.traineddata, bundled so OCR works offline
 tests/e2e/                 Playwright specs + fixture PDF
 ```
+
+## Page operations
+
+**Pages** in the toolbar opens a panel listing the document's pages. Tick some, then rotate, reorder, delete,
+or extract them to a separate file; **Merge…** appends another PDF to the end.
+
+Operations run on the document as it currently stands, not the bytes it was opened with, so annotations made
+beforehand survive. The viewer reopens on the result, and nothing is written to disk until **Save**.
+
+Extract is the exception: it produces a new file alongside the original rather than replacing what is open.
 
 ## OCR
 
