@@ -43,11 +43,18 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ## Run it
 
-```bash
+The same three commands on every platform — PowerShell, cmd, bash, zsh:
+
+```
 npm install
 npm run tauri:dev      # a window should open
 npm run tauri:build    # produces an installer under src-tauri/target/release/bundle/
 ```
+
+On Windows, if `npm` fails with "running scripts is disabled on this system",
+that is PowerShell's execution policy rather than anything to do with this
+project: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or call
+`npm.cmd` instead of `npm`.
 
 The first `tauri:dev` compiles the whole Rust dependency tree — 5–15 minutes is
 normal. After that it starts in seconds.
