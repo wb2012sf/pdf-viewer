@@ -70,6 +70,18 @@ A push button in the PDF produces no widget at all, so a Submit button cannot be
 pressed. Given the app has no network access by design, a submit action would
 have nowhere to go regardless — but the button should at least be visible.
 
+### Not a defect: a field renders in italics
+
+A widget's typography comes from the font the *document* authored the field
+with, not from the viewer. A field created with `Helvetica-Oblique` renders as
+`font-family: Helvetica…; font-style: italic`, and one created with plain
+`Helvetica` does not — confirmed with `tests/e2e/fixtures/form-italic.pdf`,
+which contains one of each.
+
+So a "signature" placeholder field appearing in italics is the PDF asking for
+it. This is unrelated to the cursive faces in the Create Signature dialog, which
+apply only to signatures typed there.
+
 ### The dropdown arrow
 
 Reported as only appearing after clicking into the field. The arrow is part of

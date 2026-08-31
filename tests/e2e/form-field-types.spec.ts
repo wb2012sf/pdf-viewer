@@ -64,6 +64,28 @@ test.describe('form field types', () => {
     expect(opacity).toBe('0');
   });
 
+  test('a widget is styled by the font the document authored it with', async ({ page }) => {
+    // A field drawn in an oblique face renders in italics, and one drawn in the
+    // upright face does not. That is the viewer honouring the PDF, not a bug —
+    // worth pinning down, because a "why is this field in italics?" report
+    // looks like a rendering fault and is not one.
+    //
+    // It also guards the widget patching below: reaching into these elements
+    // must not start overriding the document's own typography.
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(
+      fileURLToPath(new URL('./fixtures/form-italic.pdf', import.meta.url)),
+    );
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await expect(widget(page, 'field.upright')).toBeAttached({ timeout: 60_000 });
+
+    const styleOf = (name: string) =>
+      widget(page, name).evaluate((el) => window.getComputedStyle(el).fontStyle);
+
+    expect(await styleOf('field.upright')).toBe('normal');
+    expect(await styleOf('field.oblique')).toBe('italic');
+  });
+
   // The two below are viewer defects that this app patches from outside; see
   // `src/lib/viewer/form-field-fixes.ts`.
 

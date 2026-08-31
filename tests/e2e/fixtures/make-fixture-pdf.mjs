@@ -93,6 +93,24 @@ async function write(name, bytes) {
   await write('form-types.pdf', await doc.save());
 }
 
+// Two fields differing only in the font they were authored with, for checking
+// that a widget's font style follows the document rather than the viewer.
+{
+  const doc = await PDFDocument.create();
+  const upright = await doc.embedFont(StandardFonts.Helvetica);
+  const oblique = await doc.embedFont(StandardFonts.HelveticaOblique);
+  const page = doc.addPage([420, 300]);
+  const form = doc.getForm();
+
+  page.drawText('Authored with Helvetica', { x: 40, y: 250, size: 10, font: upright });
+  form.createTextField('field.upright').addToPage(page, { x: 40, y: 210, width: 300, height: 30, font: upright });
+
+  page.drawText('Authored with Helvetica-Oblique', { x: 40, y: 170, size: 10, font: upright });
+  form.createTextField('field.oblique').addToPage(page, { x: 40, y: 130, width: 300, height: 30, font: oblique });
+
+  await write('form-italic.pdf', await doc.save());
+}
+
 // A stand-in for a scan. OCR reads the *rendered* page, so what matters is that
 // the ink is large and high-contrast enough to survive recognition -- this only
 // has to be a page Tesseract can read, not a genuine raster scan.
