@@ -103,6 +103,20 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — `App` is unit-tested with the viewer mocked out. The real one needs a browser, WASM and a canvas;
   the only part `App` talks to is the registry, so a stub of that exercises the whole error path.
 
+- 2026-08-31 — Tauri desktop shell scaffolded (`src-tauri/`), but **not built or run**: the dev machine has no
+  Rust toolchain, no WebKitGTK (a 630-package dependency closure, unobtainable without root) and no display.
+  Bootstrapping that by hand would have taken hours and proved less than one real run elsewhere, so the shell
+  ships unverified with `src-tauri/SMOKE-TEST.md` naming exactly what to check.
+- 2026-08-31 — Saving is abstracted behind `src/lib/platform/save-file.ts`, which picks the OS save dialog
+  under Tauri and `<a download>` in a browser. The webview has no download manager, so `<a download>` is a
+  silent no-op there — the one break from packaging that could be predicted with confidence. Both branches are
+  unit-tested through injected dependencies; only the browser one has been exercised for real.
+- 2026-08-31 — The Tauri CSP is set explicitly rather than left at its default, since the app needs
+  `'wasm-unsafe-eval'` and `blob:` in `script-src` and `blob:` in `worker-src`: two WASM modules and two web
+  workers, one of which Tesseract loads from a blob URL. Untested — this is the most likely thing to be wrong.
+- 2026-08-31 — The app icon is a placeholder (`src-tauri/app-icon.svg`); replace before giving the installer to
+  anyone.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

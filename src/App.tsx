@@ -6,6 +6,7 @@ import { OcrControls } from './components/OcrControls';
 import { useOcr } from './hooks/useOcr';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
+import { saveFile } from './lib/platform/save-file';
 
 interface OpenDocument {
   name: string;
@@ -86,16 +87,10 @@ export function App(): React.JSX.Element {
       return;
     }
 
-    const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'application/pdf' }));
     try {
-      const link = window.document.createElement('a');
-      link.href = url;
-      link.download = document.name;
-      link.click();
-    } finally {
-      // The click has already handed the blob to the browser; holding the URL
-      // any longer just pins the bytes in memory.
-      URL.revokeObjectURL(url);
+      await saveFile(bytes, document.name);
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
     }
   }, [document, registry]);
 

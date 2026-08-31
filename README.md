@@ -29,6 +29,19 @@ npm run dev          # http://localhost:5173
 
 `npm run test:e2e` needs the browser binary once: `npx playwright install --with-deps chromium`.
 
+## Desktop app
+
+`src-tauri/` wraps the same frontend in a native window and produces an installer:
+
+```bash
+npm run tauri:dev      # run it in a window
+npm run tauri:build    # installer under src-tauri/target/release/bundle/
+```
+
+**This has never been built or run** — the machine it was written on has no Rust toolchain, no WebKitGTK and no
+display. Read `src-tauri/SMOKE-TEST.md` before trying it: it lists the prerequisites, what to actually check,
+and where the two likely failures (CSP and plugin permissions) would show up.
+
 ## Layout
 
 ```

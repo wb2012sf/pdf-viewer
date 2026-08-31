@@ -12,3 +12,7 @@ blob-report/
 .env
 .env.*
 !.env.example
+
+# Tauri build output
+src-tauri/target/
+src-tauri/gen/
