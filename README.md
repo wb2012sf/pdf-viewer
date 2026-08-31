@@ -99,8 +99,12 @@ Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled th
 
 The packaged viewer fetches four things from the internet by default — the PDFium WASM binary, its own UI
 font, the signature dialog's cursive fonts, and the rubber-stamp gallery. `src/lib/viewer/offline-config.ts`
-points the engine and the stamp gallery at bundled assets, and turns off the two font downloads (the system
-font stack replaces them).
+points the engine, the stamp gallery and the cursive fonts at bundled assets, and turns off the UI font (the
+system stack replaces it).
+
+The cursive faces matter more than they look: with no stylesheet the viewer drops the signature dialog's
+"Type" tab altogether rather than falling back to a system cursive. `scripts/sync-signature-fonts.mjs`
+refreshes them from the `@fontsource/*` packages into `public/fonts/` (156 KB, SIL OFL 1.1).
 
 The stamp gallery is built in `src/lib/viewer/stamps.ts` from `@embedpdf/default-stamps`. Only English is
 bundled; the package also carries de, nl, fr, es, sv, ja and zh-CN if another locale is wanted.

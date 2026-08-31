@@ -3,6 +3,7 @@ import type { PDFViewerConfig } from '@embedpdf/react-pdf-viewer';
 // itself rather than fetched from a CDN at first render.
 import pdfiumWasmAsset from '@embedpdf/pdfium/pdfium.wasm?url';
 import { defaultStampLibrary } from './stamps';
+import { SIGNATURE_FONTS } from './signature-fonts';
 
 /**
  * The engine runs in a web worker, and Vite emits asset URLs relative to the
@@ -43,9 +44,15 @@ export function offlineViewerConfig(src: string): PDFViewerConfig {
     // stalls on a network request that can never complete.
     fontFallback: null,
 
-    // The viewer's own UI font, and the signature dialog's cursive faces.
-    // `null` falls back to the system stack, which is present everywhere.
-    fonts: { ui: null, signature: null },
+    fonts: {
+      // The viewer's own UI font. Left off: the system stack is present
+      // everywhere and downloading Open Sans buys nothing worth a request.
+      ui: null,
+      // The signature dialog's cursive faces, served from the bundle. These do
+      // have to be supplied — with no stylesheet at all the viewer drops the
+      // "Type" tab entirely rather than falling back to a system cursive.
+      signature: SIGNATURE_FONTS,
+    },
 
     // The standard stamp gallery, supplied directly from the bundle instead of
     // being fetched. `manifests` must be cleared as well: it is a separate

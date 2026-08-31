@@ -151,6 +151,19 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — A drawn signature is saved as an `/Ink` annotation, not `/Stamp` as first assumed. Verified end
   to end: draw, place, save, and the strokes are in the file.
 
+- 2026-08-31 — The signature dialog's cursive faces are bundled (Caveat, Dancing Script, Great Vibes,
+  Pacifico; 156 KB, SIL OFL 1.1), reversing the earlier decision to turn them off. Setting `signature: null`
+  had not merely degraded the fonts — the viewer drops the "Type" tab entirely rather than falling back to a
+  system cursive, so a whole way of signing had gone missing. Same mistake as `defaultLibrary: false`.
+- 2026-08-31 — The faces live in `public/fonts/` with a generated stylesheet rather than being imported through
+  Vite: the viewer takes a *stylesheet URL*, and that stylesheet references the font files relatively, so both
+  need stable unhashed names. `scripts/sync-signature-fonts.mjs` refreshes them from `@fontsource/*`. This also
+  avoids adding `blob:` to the Tauri `style-src`, which would have meant re-verifying a CSP that now works.
+- 2026-08-31 — The five reported form-field problems all reproduce and are all EmbedPDF's, not this app's;
+  written up in `KNOWN-ISSUES.md` with a `test.fail()` test each, so a fixed dependency shows up as an
+  unexpected pass. The multiline one is auto-sizing: the viewer fits the font to the field's height, which is
+  right for one line and wrong for a box meant to wrap.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
