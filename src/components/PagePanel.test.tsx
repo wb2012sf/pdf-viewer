@@ -5,9 +5,20 @@ import { PagePanel, type PagePanelProps } from './PagePanel';
 
 afterEach(cleanup);
 
+function thumbsFor(count: number) {
+  return Array.from({ length: count }, (_unused, pageIndex) => ({
+    pageIndex,
+    url: `blob:thumb-${String(pageIndex)}`,
+    width: 60,
+    height: 80,
+  }));
+}
+
 function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
   const props: PagePanelProps = {
     rotations: [0, 0, 0],
+    thumbnails: thumbsFor(3),
+    thumbnailsStale: false,
     selected: new Set<number>(),
     busy: false,
     error: null,
@@ -19,11 +30,28 @@ function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
     onMove: vi.fn(),
     onExtract: vi.fn(),
     onMerge: vi.fn(),
+    onSplit: vi.fn(),
     onClose: vi.fn(),
     ...overrides,
   };
   render(<PagePanel {...props} />);
   return props;
+}
+
+/** Drags the page at `from` onto the page at `to`. */
+function dragPage(from: number, to: number): void {
+  const source = screen.getByTestId(`page-item-${String(from)}`);
+  const target = screen.getByTestId(`page-item-${String(to)}`);
+  const dataTransfer = {
+    effectAllowed: '',
+    dropEffect: '',
+    setData: vi.fn(),
+    getData: vi.fn(() => String(from)),
+  };
+
+  fireEvent.dragStart(source, { dataTransfer });
+  fireEvent.dragOver(target, { dataTransfer });
+  fireEvent.drop(target, { dataTransfer });
 }
 
 function button(id: string): HTMLButtonElement {
@@ -84,25 +112,6 @@ describe('PagePanel selection-dependent actions', () => {
     expect(onRotate).toHaveBeenNthCalledWith(2, 270);
   });
 
-  it('moves only a single page, since moving a scattered set has no meaning', () => {
-    renderPanel({ selected: new Set([0, 2]), rotations: [0, 0, 0] });
-
-    expect(button('pages-move-up').disabled).toBe(true);
-    expect(button('pages-move-down').disabled).toBe(true);
-  });
-
-  it('cannot move the first page earlier or the last page later', () => {
-    renderPanel({ selected: new Set([0]), rotations: [0, 0, 0] });
-    expect(button('pages-move-up').disabled).toBe(true);
-    expect(button('pages-move-down').disabled).toBe(false);
-
-    cleanup();
-
-    renderPanel({ selected: new Set([2]), rotations: [0, 0, 0] });
-    expect(button('pages-move-up').disabled).toBe(false);
-    expect(button('pages-move-down').disabled).toBe(true);
-  });
-
   it('refuses to delete every page', () => {
     // The library rejects this too; the button should not invite it.
     renderPanel({ selected: new Set([0, 1, 2]), rotations: [0, 0, 0] });
@@ -125,6 +134,84 @@ describe('PagePanel while an operation runs', () => {
       expect(button(id).disabled).toBe(true);
     }
     expect(screen.getByTestId<HTMLInputElement>('page-0').disabled).toBe(true);
+  });
+});
+
+describe('PagePanel thumbnails', () => {
+  it('shows a preview of each page', () => {
+    // A page is identifiable by what is on it, not by its number.
+    renderPanel();
+
+    expect(screen.getAllByRole('img')).toHaveLength(3);
+    expect(screen.getByAltText('Page 1').getAttribute('src')).toBe('blob:thumb-0');
+  });
+
+  it('keeps the previous previews on screen while new ones render', () => {
+    // Emptying the list would collapse it and throw away the scroll position at
+    // exactly the moment the user wants to see what their edit did.
+    renderPanel({ thumbnailsStale: true });
+
+    expect(screen.getAllByRole('img')).toHaveLength(3);
+    expect(screen.getByTestId('pages-list').getAttribute('data-stale')).toBe('true');
+  });
+
+  it('still lists a page whose preview has not arrived', () => {
+    renderPanel({ rotations: [0, 0, 0, 0], thumbnails: thumbsFor(2) });
+
+    expect(screen.getByTestId('pages-list').children).toHaveLength(4);
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+  });
+});
+
+describe('PagePanel drag to reorder', () => {
+  it('reports the page dragged and where it was dropped', () => {
+    const { onMove } = renderPanel();
+
+    dragPage(0, 2);
+
+    expect(onMove).toHaveBeenCalledWith(0, 2);
+  });
+
+  it('ignores a page dropped onto itself', () => {
+    const { onMove } = renderPanel();
+
+    dragPage(1, 1);
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('does not offer dragging while an operation runs', () => {
+    renderPanel({ busy: true });
+
+    expect(screen.getByTestId('page-item-0').getAttribute('draggable')).toBe('false');
+  });
+});
+
+describe('PagePanel split', () => {
+  it('splits at the ticked pages', () => {
+    const { onSplit } = renderPanel({ selected: new Set([1]) });
+
+    fireEvent.click(button('pages-split'));
+
+    expect(onSplit).toHaveBeenCalledOnce();
+  });
+
+  it('cannot split with nothing ticked', () => {
+    renderPanel();
+
+    expect(button('pages-split').disabled).toBe(true);
+  });
+
+  it('cannot split before the first page alone, which would change nothing', () => {
+    renderPanel({ selected: new Set([0]) });
+
+    expect(button('pages-split').disabled).toBe(true);
+  });
+
+  it('can split when a later page is ticked as well', () => {
+    renderPanel({ selected: new Set([0, 2]) });
+
+    expect(button('pages-split').disabled).toBe(false);
   });
 });
 

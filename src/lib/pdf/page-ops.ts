@@ -144,6 +144,32 @@ export async function reorderPages(bytes: Uint8Array, order: readonly number[]):
 }
 
 /**
+ * Turns a set of "start a new document here" pages into ranges for {@link splitPdf}.
+ *
+ * Page 0 is always a start, so selecting it changes nothing — that is treated as
+ * redundant rather than an error, since ticking the first page is an easy thing
+ * to do when you mean "split before every one of these".
+ */
+export function splitPointsToRanges(
+  pageCount: number,
+  splitAt: readonly number[],
+): [start: number, end: number][] {
+  if (!Number.isInteger(pageCount) || pageCount < 1) {
+    throw new PdfInputError(`split: a document must have at least one page, got ${String(pageCount)}`);
+  }
+  for (const point of splitAt) {
+    if (!Number.isInteger(point) || point < 0 || point >= pageCount) {
+      throw new PdfInputError(
+        `split: page ${String(point)} is out of range for a ${String(pageCount)}-page document`,
+      );
+    }
+  }
+
+  const starts = [...new Set([0, ...splitAt])].sort((a, b) => a - b);
+  return starts.map((start, index) => [start, starts[index + 1] ?? pageCount]);
+}
+
+/**
  * Splits into one document per range. Ranges are `[start, end)` in zero-based
  * page indices, matching `Array.prototype.slice`.
  */

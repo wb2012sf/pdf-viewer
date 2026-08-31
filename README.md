@@ -51,8 +51,8 @@ on first run.
 src/
   App.tsx                  Shell: open a file, hand it to the viewer
   components/              UI pieces, each with a co-located .test.tsx
-  components/PagePanel.tsx Page list: rotate / reorder / delete / extract / merge
-  hooks/                   useOcr, usePageOps
+  components/PagePanel.tsx Page previews: drag to reorder, rotate, delete, extract, split, merge
+  hooks/                   useOcr, usePageOps, useThumbnails
   lib/pdf/                 Page operations on real PDF bytes (pdf-lib)
     page-ops.ts            merge / extract / reorder / split / rotate / remove
     errors.ts              Boundary validation for untrusted input
@@ -68,8 +68,9 @@ tests/e2e/                 Playwright specs + fixture PDF
 
 ## Page operations
 
-**Pages** in the toolbar opens a panel listing the document's pages. Tick some, then rotate, reorder, delete,
-or extract them to a separate file; **Merge…** appends another PDF to the end.
+**Pages** in the toolbar opens a panel of page previews. Drag a page to reorder it. Tick pages to rotate or
+delete them, extract them to a separate file, or **Split…** the document into parts starting at each ticked
+page; **Merge…** appends another PDF to the end.
 
 Operations run on the document as it currently stands, not the bytes it was opened with, so annotations made
 beforehand survive. The viewer reopens on the result, and nothing is written to disk until **Save**.

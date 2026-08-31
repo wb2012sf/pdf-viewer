@@ -179,7 +179,7 @@ body {
 .pages {
   display: flex;
   flex-direction: column;
-  flex: 0 0 15rem;
+  flex: 0 0 15.5rem;
   align-self: stretch;
   min-height: 0;
   background: var(--workbench-panel);
@@ -237,6 +237,13 @@ body {
   font-size: 0.8125rem;
 }
 
+.pages__hint {
+  margin: 0;
+  padding: 0.25rem 0.75rem 0.5rem;
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+}
+
 .pages__list {
   flex: 1;
   min-height: 0;
@@ -246,28 +253,78 @@ body {
   list-style: none;
 }
 
-.pages__item label {
+/* Previews that no longer match the document are dimmed rather than removed:
+   the list keeps its height and its scroll position while the new ones render. */
+.pages__list--stale {
+  opacity: 0.55;
+}
+
+.pages__item {
+  border: 2px solid transparent;
+  border-radius: 0.375rem;
+  margin: 0 0.5rem 0.25rem;
+}
+
+.pages__item--selected {
+  background: color-mix(in srgb, var(--workbench-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--workbench-accent) 45%, transparent);
+}
+
+.pages__item--dragging {
+  opacity: 0.4;
+}
+
+/* Where the dragged page would land. */
+.pages__item--drop {
+  border-color: var(--workbench-accent);
+}
+
+.pages__label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.3125rem 0.75rem;
-  font-size: 0.875rem;
-  cursor: pointer;
+  padding: 0.375rem;
+  cursor: grab;
 }
 
-.pages__item label:hover {
-  background: var(--workbench-bg);
+.pages__label:active {
+  cursor: grabbing;
+}
+
+.pages__thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 5rem;
+  flex: 0 0 auto;
+}
+
+.pages__thumb img {
+  max-width: 100%;
+  max-height: 6.5rem;
+  border: 1px solid var(--workbench-border);
+  background: #fff;
+}
+
+.pages__thumb-placeholder {
+  display: block;
+  width: 3rem;
+  height: 4rem;
+  border: 1px dashed var(--workbench-border);
+  border-radius: 0.125rem;
 }
 
 .pages__number {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: 0.8125rem;
 }
 
 .pages__rotation {
   color: var(--workbench-muted);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
 }
-
 .workbench__body {
   flex: 1;
   min-height: 0;

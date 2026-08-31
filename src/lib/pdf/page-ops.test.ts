@@ -8,6 +8,7 @@ import {
   removePages,
   reorderPages,
   rotatePages,
+  splitPointsToRanges,
   splitPdf,
 } from './page-ops';
 import { PdfInputError } from './errors';
@@ -98,6 +99,64 @@ describe('splitPdf', () => {
 
   it('rejects an inverted range', async () => {
     await expect(splitPdf(await makePdf(3), [[2, 1]])).rejects.toThrow(/not a valid slice/);
+  });
+});
+
+describe('splitPointsToRanges', () => {
+  it('starts a new part at each chosen page', () => {
+    expect(splitPointsToRanges(6, [2, 4])).toEqual([
+      [0, 2],
+      [2, 4],
+      [4, 6],
+    ]);
+  });
+
+  it('treats the first page as redundant rather than an error', () => {
+    // Ticking page 1 when you mean "split before each of these" is easy to do.
+    expect(splitPointsToRanges(4, [0, 2])).toEqual([
+      [0, 2],
+      [2, 4],
+    ]);
+  });
+
+  it('ignores a page chosen twice', () => {
+    expect(splitPointsToRanges(4, [2, 2])).toEqual([
+      [0, 2],
+      [2, 4],
+    ]);
+  });
+
+  it('sorts points given out of order', () => {
+    expect(splitPointsToRanges(6, [4, 2])).toEqual([
+      [0, 2],
+      [2, 4],
+      [4, 6],
+    ]);
+  });
+
+  it('returns the whole document when nothing is chosen', () => {
+    expect(splitPointsToRanges(3, [])).toEqual([[0, 3]]);
+  });
+
+  it('covers every page exactly once, whatever is chosen', () => {
+    for (const points of [[1], [1, 2], [0, 3, 4], [2, 4, 5]]) {
+      const covered = splitPointsToRanges(6, points).flatMap(([start, end]) =>
+        Array.from({ length: end - start }, (_unused, offset) => start + offset),
+      );
+      expect(covered).toEqual([0, 1, 2, 3, 4, 5]);
+    }
+  });
+
+  it('produces ranges splitPdf accepts', async () => {
+    const parts = await splitPdf(await makePdf(5), splitPointsToRanges(5, [2]));
+
+    expect(parts).toHaveLength(2);
+    expect(await pageOrder(parts[0]!)).toEqual([0, 1]);
+    expect(await pageOrder(parts[1]!)).toEqual([2, 3, 4]);
+  });
+
+  it('rejects a split point the document does not have', () => {
+    expect(() => splitPointsToRanges(3, [7])).toThrow(/out of range/);
   });
 });
 

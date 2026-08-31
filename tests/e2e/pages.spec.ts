@@ -52,6 +52,16 @@ async function viewerSettles(page: Page): Promise<void> {
   await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 }
 
+/** Waits for the previews to catch up with the document. */
+async function thumbnailsSettle(page: Page): Promise<void> {
+  await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+}
+
+/** Drags the page at `from` onto the page at `to`, the way a person reorders. */
+async function dragPage(page: Page, from: number, to: number): Promise<void> {
+  await page.getByTestId(`page-item-${String(from)}`).dragTo(page.getByTestId(`page-item-${String(to)}`));
+}
+
 test.describe('page operations', () => {
   test.slow();
 
@@ -60,13 +70,32 @@ test.describe('page operations', () => {
 
     await expect(page.getByTestId('pages-list').locator('li')).toHaveCount(2);
 
-    // With page 1 ticked, "move earlier" has nowhere to go and "move later"
-    // does — the screenshot is reviewed for the panel's layout as a whole.
-    await page.getByTestId('page-0').check();
-    await expect(page.getByTestId('pages-move-up')).toBeDisabled();
-    await expect(page.getByTestId('pages-move-down')).toBeEnabled();
+    // A preview per page: a page is identifiable by what is on it, not by a
+    // number. The screenshot is reviewed for the panel's layout as a whole.
+    await thumbnailsSettle(page);
+    await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(2);
 
+    await page.getByTestId('page-0').check();
     await page.screenshot({ path: 'test-results/screenshots/page-panel.png', fullPage: true });
+  });
+
+  test('keeps the previews on screen across an edit', async ({ page }) => {
+    // The panel used to empty itself on every operation, losing its scroll
+    // position at the moment the user most wanted to see the result.
+    await openSample(page);
+    await thumbnailsSettle(page);
+
+    await page.getByTestId('page-0').check();
+    await page.getByTestId('pages-rotate-right').click();
+
+    // Never empty, at any point: stale previews stay up until new ones land.
+    await expect
+      .poll(() => page.getByTestId('pages-list').locator('img').count(), { timeout: 60_000 })
+      .toBeGreaterThan(0);
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('90°', { timeout: 60_000 });
+    await thumbnailsSettle(page);
+
+    await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(2);
   });
 
   test('rotates a page, and the rotation survives saving', async ({ page }) => {
@@ -114,7 +143,7 @@ test.describe('page operations', () => {
       .toBe('First page');
 
     await page.getByTestId('page-0').check();
-    await page.getByTestId('pages-move-down').click();
+    await dragPage(page, 0, 1);
     await expect(page.getByTestId('pages-list').locator('li')).toHaveCount(2, { timeout: 60_000 });
     await viewerSettles(page);
 
@@ -149,6 +178,28 @@ test.describe('page operations', () => {
     expect(download.suggestedFilename()).toBe('sample-pages.pdf');
     // Extract produces something alongside the original; it must not edit it.
     await expect(page.getByTestId('pages-list').locator('li')).toHaveCount(2);
+  });
+
+  test('splits into separate documents at the ticked pages', async ({ page }) => {
+    await openSample(page);
+    // Ticking page 2 means "start a new document here", giving two parts.
+    await page.getByTestId('page-1').check();
+
+    const downloads: string[] = [];
+    page.on('download', (download) => downloads.push(download.suggestedFilename()));
+
+    await page.getByTestId('pages-split').click();
+
+    await expect.poll(() => downloads, { timeout: 60_000 }).toEqual(['sample-part-1.pdf', 'sample-part-2.pdf']);
+    // Like extract, split leaves the open document alone.
+    await expect(page.getByTestId('pages-list').locator('li')).toHaveCount(2);
+  });
+
+  test('will not split before the first page alone, which would change nothing', async ({ page }) => {
+    await openSample(page);
+    await page.getByTestId('page-0').check();
+
+    await expect(page.getByTestId('pages-split')).toBeDisabled();
   });
 
   test('keeps annotations made before a page operation', async ({ page }) => {

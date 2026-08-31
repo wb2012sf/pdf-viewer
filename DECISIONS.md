@@ -177,11 +177,25 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — The unsaved-changes warning, the max-length limit and the multiline font fix were all confirmed
   working on Windows by the user. The italics report was traced to the document rather than the viewer.
 
+- 2026-08-31 — The Pages panel shows rendered previews and reorders by drag, replacing a list of page numbers
+  with ↑/↓ buttons. A page is identifiable by what is on it, and moving a page ten places was ten clicks.
+- 2026-08-31 — Previews stay on screen while the next set renders, rather than the list emptying on every
+  operation — which collapsed it and lost the scroll position exactly when the user wanted to see the result.
+  Staleness is *derived* (do the previews come from the bytes now open?) rather than stored, so the effect
+  never sets state synchronously.
+- 2026-08-31 — Thumbnails render at 0.4 scale with annotations included: a preview omitting the stamp just
+  placed is worse than no preview, because it looks like the stamp did not land.
+- 2026-08-31 — The Pages panel is 15.5rem. Wider made the thumbnails nicer but pushed the viewer's own tab bar
+  into an overflow menu at 1280px, which costs more than it gains.
+- 2026-08-31 — Split is driven by ticking the pages that should *start* a new document, and writes the parts
+  alongside the original rather than replacing it — like extract. Ticking page 1 is treated as redundant
+  rather than an error. Dismissing one save dialog stops the rest, instead of asking a dozen more times.
+- 2026-08-31 — After a drag, the selection follows the page to its new position. Leaving the tick on whatever
+  slid into the old slot would be actively misleading.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
-- `splitPdf` is implemented and tested but still not reachable from the UI — the Pages panel offers merge,
-  extract, reorder, rotate and delete, but nothing that bursts a document into several files.
 - File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
   the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
 - The desktop app is verified on Windows only; macOS and Linux are untried.

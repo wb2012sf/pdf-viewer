@@ -7,6 +7,7 @@ import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { useOcr } from './hooks/useOcr';
 import { usePageOps, type PageOperation } from './hooks/usePageOps';
+import { useThumbnails } from './hooks/useThumbnails';
 import {
   extractPages,
   getPageRotations,
@@ -14,6 +15,8 @@ import {
   orderWithPageMoved,
   removePages,
   reorderPages,
+  splitPdf,
+  splitPointsToRanges,
   rotatePages,
 } from './lib/pdf/page-ops';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
@@ -61,8 +64,15 @@ export function App(): React.JSX.Element {
   const pageOps = usePageOps();
   const mergeInputRef = useRef<HTMLInputElement>(null);
   const openPdfRef = useRef<OpenPdfHandle>(null);
+  // Split produces several documents where a page operation yields one, so the
+  // parts are carried out of the operation through here.
+  const splitParts = useRef<Uint8Array[]>([]);
 
   const engine = registry?.getEngine() ?? null;
+
+  // Page previews for the panel. Rendered from the document bytes rather than
+  // the viewer, so they show exactly what the next operation will act on.
+  const thumbnails = useThumbnails(pagesOpen ? engine : null, pagesOpen ? (document?.bytes ?? null) : null);
 
   // Object URLs pin the file in memory until revoked.
   useEffect(() => {
@@ -197,6 +207,47 @@ export function App(): React.JSX.Element {
       await runPageOp((bytes) => mergePdfs([bytes, appended]));
     },
     [runPageOp],
+  );
+
+  const handleSplit = useCallback(async () => {
+    if (!registry || !document) return;
+
+    // Like extract, split produces files alongside the original rather than
+    // replacing what is open — the document being split is usually still wanted.
+    const parts = await applyPageOp(registry, async (bytes) =>
+      // `applyPageOp` hands back one document, so the parts are carried out
+      // through this closure instead.
+      {
+        splitParts.current = await splitPdf(bytes, splitPointsToRanges(rotations.length, selectedPages));
+        return bytes;
+      },
+    );
+    if (!parts) return;
+
+    const base = document.name.replace(/\.pdf$/i, '');
+    try {
+      for (const [index, part] of splitParts.current.entries()) {
+        const outcome = await saveFile(part, `${base}-part-${String(index + 1)}.pdf`);
+        // Dismissing one dialog means the user changed their mind about the
+        // rest, rather than wanting to be asked another dozen times.
+        if (outcome === 'cancelled') break;
+      }
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      splitParts.current = [];
+    }
+  }, [registry, document, applyPageOp, rotations.length, selectedPages]);
+
+  /** Moves a page and keeps it selected where it landed. */
+  const handleMove = useCallback(
+    async (from: number, to: number) => {
+      await runPageOp((bytes) => reorderPages(bytes, orderWithPageMoved(rotations.length, from, to)));
+      // Following the page you just dragged is the least surprising thing to do;
+      // leaving the tick on whatever page slid into its old slot is not.
+      setSelected((prev) => (prev.has(from) ? new Set([to]) : prev));
+    },
+    [runPageOp, rotations.length],
   );
 
   const handleSave = useCallback(async (): Promise<SaveResult> => {
@@ -377,15 +428,13 @@ export function App(): React.JSX.Element {
             onToggle={handleToggle}
             onSelectAll={() => setSelected(new Set(rotations.map((_unused, index) => index)))}
             onClearSelection={() => setSelected(new Set())}
+            thumbnails={thumbnails.thumbnails}
+            thumbnailsStale={thumbnails.stale}
             onRotate={(degrees) => void runPageOp((bytes) => rotatePages(bytes, selectedPages, degrees))}
             onDelete={() => void runPageOp((bytes) => removePages(bytes, selectedPages))}
-            onMove={(direction) =>
-              void runPageOp((bytes) => {
-                const from = selectedPages[0]!;
-                return reorderPages(bytes, orderWithPageMoved(rotations.length, from, from + direction));
-              })
-            }
+            onMove={(from, to) => void handleMove(from, to)}
             onExtract={() => void handleExtract()}
+            onSplit={() => void handleSplit()}
             onMerge={() => mergeInputRef.current?.click()}
             onClose={() => setPagesOpen(false)}
           />
