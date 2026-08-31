@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 import type { PluginRegistry } from '@embedpdf/core';
-import { OpenPdfButton } from './components/OpenPdfButton';
+import { OpenPdfButton, type OpenPdfHandle } from './components/OpenPdfButton';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { useOcr } from './hooks/useOcr';
@@ -18,6 +19,7 @@ import {
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
+import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
 
 interface OpenDocument {
   name: string;
@@ -26,6 +28,12 @@ interface OpenDocument {
   /** Object URL handed to the viewer; revoked when it is replaced or closed. */
   url: string;
 }
+
+/** How a save attempt ended; anything but 'saved' leaves the work unwritten. */
+type SaveResult = 'saved' | 'cancelled' | 'failed';
+
+/** What the user asked for while there was unsaved work to warn about. */
+type PendingAction = 'open' | 'close';
 
 function openDocumentFrom(name: string, bytes: Uint8Array): OpenDocument {
   // `slice()` hands the Blob a buffer of its own; the bytes may be a view into
@@ -39,11 +47,19 @@ export function App(): React.JSX.Element {
   const [registry, setRegistry] = useState<PluginRegistry | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pagesOpen, setPagesOpen] = useState(false);
+  /**
+   * Edits this app made (OCR, page operations) since the last save. Edits made
+   * *inside* the viewer are tracked by the viewer itself and asked for
+   * separately — see `viewerHasUnsavedChanges`.
+   */
+  const [editedSinceSave, setEditedSinceSave] = useState(false);
+  const [pending, setPending] = useState<PendingAction | null>(null);
   const [rotations, setRotations] = useState<number[]>([]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const ocr = useOcr();
   const pageOps = usePageOps();
   const mergeInputRef = useRef<HTMLInputElement>(null);
+  const openPdfRef = useRef<OpenPdfHandle>(null);
 
   const engine = registry?.getEngine() ?? null;
 
@@ -58,11 +74,12 @@ export function App(): React.JSX.Element {
   // Swapping the document remounts the viewer, which builds a fresh registry
   // and engine. Dropping the old registry here keeps OCR from being handed a
   // reference that is about to be torn down; `onReady` supplies the new one.
-  const replaceDocument = useCallback((next: OpenDocument): void => {
+  const replaceDocument = useCallback((next: OpenDocument | null, edited: boolean): void => {
     setRegistry(null);
     setSaveError(null);
     // Page indices from the old document mean nothing in the new one.
     setSelected(new Set());
+    setEditedSinceSave(edited);
     setDocument(next);
   }, []);
 
@@ -92,7 +109,7 @@ export function App(): React.JSX.Element {
   const handleOpen = useCallback(
     async (file: File) => {
       resetOcr();
-      replaceDocument(openDocumentFrom(file.name, new Uint8Array(await file.arrayBuffer())));
+      replaceDocument(openDocumentFrom(file.name, new Uint8Array(await file.arrayBuffer())), false);
     },
     [replaceDocument, resetOcr],
   );
@@ -109,7 +126,7 @@ export function App(): React.JSX.Element {
 
     // Reopen the viewer on the result so the new text layer is searchable at
     // once, rather than making the user save the file and open it again.
-    replaceDocument(openDocumentFrom(document.name, searchable));
+    replaceDocument(openDocumentFrom(document.name, searchable), true);
   }, [registry, engine, document, runOcr, replaceDocument]);
 
   const { apply: applyPageOp } = pageOps;
@@ -121,7 +138,7 @@ export function App(): React.JSX.Element {
 
       const next = await applyPageOp(registry, operation);
       if (!next) return;
-      replaceDocument(openDocumentFrom(document.name, next));
+      replaceDocument(openDocumentFrom(document.name, next), true);
     },
     [registry, document, applyPageOp, replaceDocument],
   );
@@ -159,8 +176,8 @@ export function App(): React.JSX.Element {
     [runPageOp],
   );
 
-  const handleSave = useCallback(async () => {
-    if (!document || !registry) return;
+  const handleSave = useCallback(async (): Promise<SaveResult> => {
+    if (!document || !registry) return 'failed';
     setSaveError(null);
 
     let bytes: Uint8Array;
@@ -170,15 +187,50 @@ export function App(): React.JSX.Element {
       // Better to say the file could not be read than to hand the user a copy
       // that silently lacks everything they just did to it.
       setSaveError(cause instanceof Error ? cause.message : String(cause));
-      return;
+      return 'failed';
     }
 
     try {
-      await saveFile(bytes, document.name);
+      const outcome = await saveFile(bytes, document.name);
+      // A dismissed save dialog wrote nothing, so the work is still unsaved.
+      if (outcome === 'saved') setEditedSinceSave(false);
+      return outcome;
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : String(cause));
+      return 'failed';
     }
   }, [document, registry]);
+
+  /**
+   * Anything that would be lost by closing or replacing the document: edits this
+   * app made, plus edits made inside the viewer.
+   */
+  const hasUnsavedChanges = editedSinceSave || viewerHasUnsavedChanges(registry);
+
+  const closeDocument = useCallback(() => {
+    setPagesOpen(false);
+    resetOcr();
+    replaceDocument(null, false);
+  }, [replaceDocument, resetOcr]);
+
+  /** Runs the action the user asked for once the unsaved work is settled. */
+  const completePending = useCallback(
+    (action: PendingAction) => {
+      setPending(null);
+      if (action === 'close') closeDocument();
+      else openPdfRef.current?.openPicker();
+    },
+    [closeDocument],
+  );
+
+  const requestAction = useCallback(
+    (action: PendingAction): boolean => {
+      if (!document || !hasUnsavedChanges) return true;
+      setPending(action);
+      return false;
+    },
+    [document, hasUnsavedChanges],
+  );
 
   return (
     <div className="workbench">
@@ -224,13 +276,50 @@ export function App(): React.JSX.Element {
               disabled={registry === null}
               data-testid="save"
             >
-              Save
+              Save as…
+            </button>
+            <button
+              type="button"
+              className="workbench__button"
+              onClick={() => {
+                if (requestAction('close')) closeDocument();
+              }}
+              data-testid="close"
+            >
+              Close
             </button>
           </>
         )}
 
-        <OpenPdfButton onOpen={(file) => void handleOpen(file)} />
+        <OpenPdfButton
+          ref={openPdfRef}
+          onOpen={(file) => void handleOpen(file)}
+          beforeOpen={() => requestAction('open')}
+        />
       </header>
+
+      {pending !== null && (
+        <ConfirmDialog
+          title={pending === 'close' ? 'Close without saving?' : 'Open another document?'}
+          message={
+            pending === 'close'
+              ? 'This document has changes that have not been written to a file. Closing it will lose them.'
+              : 'This document has changes that have not been written to a file. Opening another will lose them.'
+          }
+          confirmLabel={pending === 'close' ? 'Close without saving' : 'Discard and open'}
+          saveLabel="Save as…"
+          onCancel={() => setPending(null)}
+          onConfirm={() => completePending(pending)}
+          onSave={() => {
+            // Only carry on once something was actually written: a dismissed
+            // save dialog must not quietly discard the work it was protecting.
+            void handleSave().then((outcome) => {
+              if (outcome === 'saved') completePending(pending);
+              else setPending(null);
+            });
+          }}
+        />
+      )}
 
       {/* Off-screen: merging needs a second document, and the panel's button
           drives this rather than showing a second file control in the toolbar. */}

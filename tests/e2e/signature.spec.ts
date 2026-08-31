@@ -133,9 +133,9 @@ test.describe('signatures', () => {
     ]);
     const saved = new Uint8Array(await readFile(await download.path()));
 
-    // A placed signature is a Stamp annotation carrying the drawn image — the
-    // same annotation type the rubber stamps use.
-    expect(await annotationSubtypes(saved, 0)).toContain('/Stamp');
+    // A drawn signature is written as an Ink annotation — the strokes
+    // themselves — rather than the Stamp a rubber stamp produces.
+    expect(await annotationSubtypes(saved, 0)).toContain('/Ink');
 
     await page.screenshot({ path: 'test-results/screenshots/signature-placed.png', fullPage: true });
   });

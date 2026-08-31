@@ -1,9 +1,20 @@
-import { useId, useRef, type ChangeEvent } from 'react';
+import { useId, useImperativeHandle, useRef, type ChangeEvent, type Ref } from 'react';
+
+export interface OpenPdfHandle {
+  /** Opens the file picker without asking anything first. */
+  openPicker: () => void;
+}
 
 export interface OpenPdfButtonProps {
   onOpen: (file: File) => void;
   /** Surfaced to the user when the picked file is rejected. */
   onError?: (message: string) => void;
+  /**
+   * Called before the picker opens. Returning false stops it, so the caller can
+   * ask about unsaved work first and then drive `openPicker` from the answer.
+   */
+  beforeOpen?: () => boolean;
+  ref?: Ref<OpenPdfHandle>;
 }
 
 /**
@@ -13,9 +24,11 @@ export interface OpenPdfButtonProps {
  * happens when the bytes are parsed (see `lib/pdf/errors.ts`), because a file
  * picker's `accept` filter can be bypassed on every platform.
  */
-export function OpenPdfButton({ onOpen, onError }: OpenPdfButtonProps): React.JSX.Element {
+export function OpenPdfButton({ onOpen, onError, beforeOpen, ref }: OpenPdfButtonProps): React.JSX.Element {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({ openPicker: () => inputRef.current?.click() }), []);
 
   function handleChange(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
@@ -42,9 +55,19 @@ export function OpenPdfButton({ onOpen, onError }: OpenPdfButtonProps): React.JS
         data-testid="file-input"
         onChange={handleChange}
       />
-      <label className="workbench__button" htmlFor={inputId}>
+      <button
+        type="button"
+        className="workbench__button"
+        data-testid="open-pdf"
+        onClick={() => {
+          // The picker is opened from this click, or not at all: reopening it
+          // later, after an await, would no longer be a user gesture.
+          if (beforeOpen?.() === false) return;
+          inputRef.current?.click();
+        }}
+      >
         Open PDF…
-      </label>
+      </button>
     </>
   );
 }

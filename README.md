@@ -38,9 +38,12 @@ npm run tauri:dev      # run it in a window
 npm run tauri:build    # installer under src-tauri/target/release/bundle/
 ```
 
-**This has never been built or run** — the machine it was written on has no Rust toolchain, no WebKitGTK and no
-display. Read `src-tauri/SMOKE-TEST.md` before trying it: it lists the prerequisites, what to actually check,
-and where the two likely failures (CSP and plugin permissions) would show up.
+Verified on Windows on 2026-08-31: the window opens, PDFium and Tesseract both run, the stamp gallery loads,
+Save writes through the OS dialog, and all of it works with the network off. `src-tauri/SMOKE-TEST.md` has the
+per-platform prerequisites and the checklist.
+
+It is still unverified on macOS and Linux, and installers are unsigned, so SmartScreen and Gatekeeper will warn
+on first run.
 
 ## Layout
 

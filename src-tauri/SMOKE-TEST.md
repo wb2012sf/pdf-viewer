@@ -1,11 +1,15 @@
 # Tauri smoke test
 
-The desktop shell is scaffolded but **has never been built or run**. It could
-not be, on the machine it was written on: Tauri needs a Rust toolchain, the
-WebKitGTK development libraries (a 630-package dependency closure) and a
-display, none of which were available and none installable without root.
+**Passed on Windows, 2026-08-31.** All five checks below were run by hand
+against a real build: the window opens, a PDF renders, the stamp gallery
+populates, OCR completes, Save writes a file, and all of it works offline.
 
-Everything below is therefore unverified. Run it on a machine with a GUI.
+Still unverified on **macOS and Linux**. The checklist stays here for those, and
+for re-running after anything touches asset loading, the CSP or the save path.
+
+It cannot be run on the machine this project is developed on: Tauri needs a Rust
+toolchain, the WebKitGTK development libraries (a 630-package dependency
+closure) and a display, none of which are available there without root.
 
 ## Prerequisites
 

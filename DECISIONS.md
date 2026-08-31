@@ -130,6 +130,27 @@ One line per assumption made instead of interrupting a session, newest last.
   permutation; a property test checks every from/to pair still yields a full permutation, which is what
   `reorderPages` demands.
 
+- 2026-08-31 — **The Tauri smoke test passed on Windows.** All five checks by hand: window opens, PDFium and
+  Tesseract both run, the stamp gallery loads, Save writes through the OS dialog, and everything works with the
+  network off. The offline promise and the custom-protocol assumptions are therefore no longer speculative on
+  that platform. macOS and Linux are still unverified.
+- 2026-08-31 — `vite.config.ts` excludes `src-tauri/**` from the dev-server watcher. `tauri dev` runs Vite
+  while cargo is linking, and watching the DLL mid-write fails with EBUSY on Windows, killing the dev server
+  and `tauri dev` with it. The scaffold had missed what the standard Tauri + Vite setup does.
+- 2026-08-31 — "Save" is now "Save as…", since every save goes through a file dialog and writes a copy; there is
+  no in-place overwrite of the opened file. A Close button sits beside it.
+- 2026-08-31 — Unsaved-change detection is two sources ORed: edits this app made (OCR, page operations, tracked
+  as a flag) and edits made inside the viewer (asked of the history plugin's `canUndo`). Neither alone is
+  enough — the viewer knows nothing about OCR, and the app cannot see an annotation being drawn.
+- 2026-08-31 — The warning dialog offers Cancel / Save as… / discard rather than a bare confirm, so the user is
+  never made to choose between losing work and abandoning what they asked for. Cancel takes focus, so a stray
+  Return cannot discard a document. Saving from the dialog only proceeds if a file was actually written — a
+  dismissed save dialog must not quietly discard the work it was protecting.
+- 2026-08-31 — The dialog is rendered in-app rather than using `window.confirm`, which is unstyled, blocks the
+  thread, and behaves inconsistently inside a native webview.
+- 2026-08-31 — A drawn signature is saved as an `/Ink` annotation, not `/Stamp` as first assumed. Verified end
+  to end: draw, place, save, and the strokes are in the file.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
