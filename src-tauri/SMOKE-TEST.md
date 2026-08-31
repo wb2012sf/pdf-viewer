@@ -9,15 +9,37 @@ Everything below is therefore unverified. Run it on a machine with a GUI.
 
 ## Prerequisites
 
-- **Rust** — <https://rustup.rs> (`rustup` installs into your home directory, no root needed)
-- **Linux only** — the system libraries Tauri links against:
-  ```bash
-  sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev build-essential curl file libssl-dev libayatana-appindicator3-dev
-  ```
-- **Windows** — WebView2 (already present on Windows 11) and the MSVC build tools
-- **macOS** — Xcode command line tools
+Pick your platform. All of these need Node installed as well.
 
-WSL will not work without WSLg; build on the host rather than inside WSL.
+### Windows (PowerShell)
+
+```powershell
+winget install Rustlang.Rustup
+winget install Microsoft.EdgeWebView2Runtime        # no-op on Windows 11
+winget install Microsoft.VisualStudio.2022.BuildTools --override `
+  "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+Reopen PowerShell afterwards so `cargo` is on the PATH.
+
+Build on the Windows host, **not inside WSL** — WSL has no display without
+WSLg, and pointing Windows `cargo` at a `\\wsl$\` path causes its own problems.
+
+### Linux
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # no root needed
+sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev build-essential curl file libssl-dev libayatana-appindicator3-dev
+```
+
+A display is required; a headless VPS cannot run this.
+
+### macOS
+
+```bash
+xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
 ## Run it
 
@@ -26,6 +48,13 @@ npm install
 npm run tauri:dev      # a window should open
 npm run tauri:build    # produces an installer under src-tauri/target/release/bundle/
 ```
+
+The first `tauri:dev` compiles the whole Rust dependency tree — 5–15 minutes is
+normal. After that it starts in seconds.
+
+Any installer `tauri:build` produces is unsigned, so Windows SmartScreen and
+macOS Gatekeeper will warn on first run. That is expected and is a separate open
+decision (see `DECISIONS.md`).
 
 ## What to actually check
 
