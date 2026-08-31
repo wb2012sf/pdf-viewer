@@ -174,6 +174,14 @@ One line per assumption made instead of interrupting a session, newest last.
   than untidy, which is what justifies reaching into another component's shadow DOM. A MutationObserver
   reapplies them, since widgets are rebuilt on scroll and zoom.
 
+- 2026-08-31 — The unsaved-changes warning, the max-length limit and the multiline font fix were all confirmed
+  working on Windows by the user. The italics report was traced to the document rather than the viewer.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
+- `splitPdf` is implemented and tested but still not reachable from the UI — the Pages panel offers merge,
+  extract, reorder, rotate and delete, but nothing that bursts a document into several files.
+- File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
+  the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
+- The desktop app is verified on Windows only; macOS and Linux are untried.
