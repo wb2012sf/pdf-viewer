@@ -213,6 +213,20 @@ One line per assumption made instead of interrupting a session, newest last.
   instead replaces the entire command set and the viewer then fails to render at all; the plugin capability
   replaces a single command in place.
 
+- 2026-08-31 — Each page preview carries its own rotate and delete buttons, shown on hover and reachable by
+  keyboard. They act on that page alone even when others are selected: the page a button sits on is the one
+  being pointed at, and borrowing the selection would make the same click do different things.
+- 2026-08-31 — Shift-click selects the run between the last plainly-clicked page and this one. The anchor does
+  not move on a shift-click, so a second one re-picks the run rather than chaining off the end of the first.
+- 2026-08-31 — Dragging a page that is part of the selection moves the whole selection; dragging one outside it
+  moves only that page. `orderWithPagesMoved` generalises the single-page arithmetic and reproduces it exactly
+  for one page, which is asserted rather than assumed. A selection straddling the drop target counts as moving
+  upwards, since there is no reading under which half of it goes each way.
+- 2026-08-31 — After a move the selection follows the pages to wherever they landed, read out of the
+  permutation rather than guessed.
+- 2026-08-31 — The tick boxes must not `preventDefault` on click: doing so left a row highlighted and counted as
+  selected while its box rendered unticked. Caught in a screenshot review, and now asserted.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

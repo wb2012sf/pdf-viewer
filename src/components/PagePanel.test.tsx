@@ -29,6 +29,8 @@ function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
     onRotate: vi.fn(),
     onDelete: vi.fn(),
     onMove: vi.fn(),
+    onRotatePage: vi.fn(),
+    onDeletePage: vi.fn(),
     onExtract: vi.fn(),
     onMerge: vi.fn(),
     onSplit: vi.fn(),
@@ -80,7 +82,7 @@ describe('PagePanel', () => {
 
     fireEvent.click(screen.getByTestId('page-2'));
 
-    expect(onToggle).toHaveBeenCalledWith(2);
+    expect(onToggle).toHaveBeenCalledWith(2, false);
   });
 });
 
@@ -171,7 +173,7 @@ describe('PagePanel drag to reorder', () => {
 
     dragPage(0, 2);
 
-    expect(onMove).toHaveBeenCalledWith(0, 2);
+    expect(onMove).toHaveBeenCalledWith([0], 2);
   });
 
   it('ignores a page dropped onto itself', () => {
@@ -186,6 +188,97 @@ describe('PagePanel drag to reorder', () => {
     renderPanel({ busy: true });
 
     expect(screen.getByTestId('page-item-0').getAttribute('draggable')).toBe('false');
+  });
+});
+
+describe('PagePanel per-page controls', () => {
+  it('rotates the page its buttons sit on', () => {
+    const { onRotatePage } = renderPanel();
+
+    fireEvent.click(screen.getByTestId('page-1-rotate-right'));
+    fireEvent.click(screen.getByTestId('page-1-rotate-left'));
+
+    expect(onRotatePage).toHaveBeenNthCalledWith(1, 1, 90);
+    expect(onRotatePage).toHaveBeenNthCalledWith(2, 1, 270);
+  });
+
+  it('acts on that page alone even when others are selected', () => {
+    // The page the button sits on is the one being pointed at; borrowing the
+    // selection would make the same click do different things.
+    const { onRotatePage } = renderPanel({ selected: new Set([0, 2]) });
+
+    fireEvent.click(screen.getByTestId('page-1-rotate-right'));
+
+    expect(onRotatePage).toHaveBeenCalledWith(1, 90);
+  });
+
+  it('deletes the page its button sits on', () => {
+    const { onDeletePage } = renderPanel();
+
+    fireEvent.click(screen.getByTestId('page-2-delete'));
+
+    expect(onDeletePage).toHaveBeenCalledWith(2);
+  });
+
+  it('will not delete the only page there is', () => {
+    renderPanel({ rotations: [0], turnedBy: [0], thumbnails: thumbsFor(1) });
+
+    expect(screen.getByTestId<HTMLButtonElement>('page-0-delete').disabled).toBe(true);
+  });
+});
+
+describe('PagePanel range selection', () => {
+  it('reports a shift-click as extending the selection', () => {
+    const { onToggle } = renderPanel({ selected: new Set([0]) });
+
+    fireEvent.click(screen.getByTestId('page-2'), { shiftKey: true });
+
+    expect(onToggle).toHaveBeenCalledWith(2, true);
+  });
+
+  it('reports a plain click as a plain toggle', () => {
+    const { onToggle } = renderPanel({ selected: new Set([0]) });
+
+    fireEvent.click(screen.getByTestId('page-2'));
+
+    expect(onToggle).toHaveBeenCalledWith(2, false);
+  });
+
+  it('shows every selected page as ticked', () => {
+    // A row highlighted but unticked, or the reverse, means the boxes have
+    // stopped agreeing with the state that drives them.
+    renderPanel({ selected: new Set([1, 2]) });
+
+    expect(screen.getByTestId<HTMLInputElement>('page-0').checked).toBe(false);
+    expect(screen.getByTestId<HTMLInputElement>('page-1').checked).toBe(true);
+    expect(screen.getByTestId<HTMLInputElement>('page-2').checked).toBe(true);
+  });
+});
+
+describe('PagePanel dragging a selection', () => {
+  it('moves the whole selection when one of its pages is dragged', () => {
+    const { onMove } = renderPanel({ selected: new Set([0, 1]) });
+
+    dragPage(0, 2);
+
+    expect(onMove).toHaveBeenCalledWith([0, 1], 2);
+  });
+
+  it('moves only the dragged page when it is outside the selection', () => {
+    // Dragging something you have not selected should not drag what you have.
+    const { onMove } = renderPanel({ selected: new Set([0, 1]) });
+
+    dragPage(2, 0);
+
+    expect(onMove).toHaveBeenCalledWith([2], 0);
+  });
+
+  it('ignores a drop back onto the selection being dragged', () => {
+    const { onMove } = renderPanel({ selected: new Set([0, 1]) });
+
+    dragPage(0, 1);
+
+    expect(onMove).not.toHaveBeenCalled();
   });
 });
 

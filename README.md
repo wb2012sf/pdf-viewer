@@ -68,9 +68,13 @@ tests/e2e/                 Playwright specs + fixture PDF
 
 ## Page operations
 
-**Pages** in the toolbar opens a panel of page previews. Drag a page to reorder it. Tick pages to rotate or
-delete them, extract them to a separate file, or **Split…** the document into parts starting at each ticked
-page; **Merge…** appends another PDF to the end.
+**Pages** in the toolbar opens a panel of page previews.
+
+- **Hover a page** for its own rotate and delete buttons, which act on that page alone.
+- **Drag** a page to reorder it. Dragging a page that is part of the selection moves the whole selection.
+- **Click** a page to tick it, **shift-click** to tick the whole run between the two.
+- Ticked pages can be rotated, deleted, extracted to a separate file, or used as **Split…** points, which start
+  a new document at each. **Append…** adds another PDF to the end.
 
 Operations run on the document as it currently stands, not the bytes it was opened with, so annotations made
 beforehand survive. The viewer reopens on the result, and nothing is written to disk until **Save**.

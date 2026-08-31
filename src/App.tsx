@@ -12,7 +12,7 @@ import {
   extractPages,
   getPageRotations,
   mergePdfs,
-  orderWithPageMoved,
+  orderWithPagesMoved,
   removePages,
   reorderPages,
   splitPdf,
@@ -222,8 +222,26 @@ export function App(): React.JSX.Element {
 
   const selectedPages = useMemo(() => [...selected].sort((a, b) => a - b), [selected]);
 
-  const handleToggle = useCallback((pageIndex: number) => {
+  /**
+   * The page a plain click last landed on, which a shift-click extends from.
+   * Held in a ref because it is only ever read at the moment of a click.
+   */
+  const selectionAnchor = useRef<number | null>(null);
+
+  const handleToggle = useCallback((pageIndex: number, extend: boolean) => {
     setSelected((prev) => {
+      const anchor = selectionAnchor.current;
+      if (extend && anchor !== null) {
+        // Shift-click selects the whole run between the two, leaving anything
+        // already ticked elsewhere alone — and does not move the anchor, so a
+        // second shift-click re-picks the run rather than chaining off it.
+        const [from, to] = anchor <= pageIndex ? [anchor, pageIndex] : [pageIndex, anchor];
+        const next = new Set(prev);
+        for (let index = from; index <= to; index += 1) next.add(index);
+        return next;
+      }
+
+      selectionAnchor.current = pageIndex;
       const next = new Set(prev);
       if (!next.delete(pageIndex)) next.add(pageIndex);
       return next;
@@ -283,13 +301,25 @@ export function App(): React.JSX.Element {
     }
   }, [registry, document, applyPageOp, rotations.length, selectedPages]);
 
-  /** Moves a page and keeps it selected where it landed. */
+  /** Moves one or more pages, keeping them selected where they land. */
   const handleMove = useCallback(
-    async (from: number, to: number) => {
-      await runPageOp((bytes) => reorderPages(bytes, orderWithPageMoved(rotations.length, from, to)));
-      // Following the page you just dragged is the least surprising thing to do;
-      // leaving the tick on whatever page slid into its old slot is not.
-      setSelected((prev) => (prev.has(from) ? new Set([to]) : prev));
+    async (from: readonly number[], to: number) => {
+      const order = orderWithPagesMoved(rotations.length, from, to);
+      await runPageOp((bytes) => reorderPages(bytes, order));
+
+      // Follow the pages that were dragged to wherever they ended up. Leaving
+      // the ticks on whatever slid into the old slots would be actively
+      // misleading, and `order` already says exactly where each page went.
+      const moved = new Set(from);
+      setSelected(
+        new Set(
+          order.reduce<number[]>((landed, original, position) => {
+            if (moved.has(original)) landed.push(position);
+            return landed;
+          }, []),
+        ),
+      );
+      selectionAnchor.current = null;
     },
     [runPageOp, rotations.length],
   );
@@ -491,6 +521,10 @@ export function App(): React.JSX.Element {
             onRotate={(degrees) => void runPageOp((bytes) => rotatePages(bytes, selectedPages, degrees))}
             onDelete={() => void runPageOp((bytes) => removePages(bytes, selectedPages))}
             onMove={(from, to) => void handleMove(from, to)}
+            onRotatePage={(pageIndex, degrees) =>
+              void runPageOp((bytes) => rotatePages(bytes, [pageIndex], degrees))
+            }
+            onDeletePage={(pageIndex) => void runPageOp((bytes) => removePages(bytes, [pageIndex]))}
             onExtract={() => void handleExtract()}
             onSplit={() => void handleSplit()}
             onMerge={() => mergeInputRef.current?.click()}

@@ -5,6 +5,7 @@ import {
   getPageRotations,
   mergePdfs,
   orderWithPageMoved,
+  orderWithPagesMoved,
   removePages,
   reorderPages,
   rotatePages,
@@ -99,6 +100,49 @@ describe('splitPdf', () => {
 
   it('rejects an inverted range', async () => {
     await expect(splitPdf(await makePdf(3), [[2, 1]])).rejects.toThrow(/not a valid slice/);
+  });
+});
+
+describe('orderWithPagesMoved', () => {
+  it('moves a block of neighbouring pages together', () => {
+    expect(orderWithPagesMoved(5, [1, 2], 4)).toEqual([0, 3, 4, 1, 2]);
+  });
+
+  it('moves a block upwards, landing before the target', () => {
+    expect(orderWithPagesMoved(5, [3, 4], 1)).toEqual([0, 3, 4, 1, 2]);
+  });
+
+  it('keeps the block in its own order however the pages were selected', () => {
+    expect(orderWithPagesMoved(5, [4, 3], 0)).toEqual([3, 4, 0, 1, 2]);
+  });
+
+  it('gathers a scattered selection into one block', () => {
+    // Dragging pages 1 and 5 onto page 3: they arrive together, in their own
+    // order. A selection straddling the target counts as moving upwards, so the
+    // block lands before it — there is no reading under which half goes each way.
+    expect(orderWithPagesMoved(5, [0, 4], 2)).toEqual([1, 0, 4, 2, 3]);
+  });
+
+  it('agrees with the single-page form', () => {
+    for (let from = 0; from < 5; from += 1) {
+      for (let to = 0; to < 5; to += 1) {
+        expect(orderWithPagesMoved(5, [from], to)).toEqual(orderWithPageMoved(5, from, to));
+      }
+    }
+  });
+
+  it('always returns a full permutation', () => {
+    // This feeds `reorderPages`, which rejects anything that would drop a page.
+    for (const moving of [[0], [1, 2], [0, 3], [2, 3, 4], [0, 1, 2, 3, 4]]) {
+      for (let to = 0; to < 5; to += 1) {
+        expect([...orderWithPagesMoved(5, moving, to)].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+      }
+    }
+  });
+
+  it('rejects a page it does not have', () => {
+    expect(() => orderWithPagesMoved(3, [5], 0)).toThrow(/out of range/);
+    expect(() => orderWithPagesMoved(3, [0], 9)).toThrow(/out of range/);
   });
 });
 

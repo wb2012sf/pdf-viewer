@@ -104,26 +104,45 @@ export async function removePages(bytes: Uint8Array, pageIndices: readonly numbe
 }
 
 /**
- * The page order that results from dragging the page at `from` to sit at `to`.
+ * The page order that results from dragging `moving` onto the page at `to`.
+ *
+ * Dragging downwards drops the block *after* the target, dragging upwards drops
+ * it *before* — which is what a list reorder does everywhere else, and the only
+ * reading under which dragging a page onto the one below it actually swaps them.
  *
  * Pure index arithmetic, kept here so the UI never hand-rolls a permutation and
  * risks handing `reorderPages` something that drops a page.
  */
-export function orderWithPageMoved(pageCount: number, from: number, to: number): number[] {
+export function orderWithPagesMoved(pageCount: number, moving: readonly number[], to: number): number[] {
   if (!Number.isInteger(pageCount) || pageCount < 1) {
     throw new PdfInputError(`move: a document must have at least one page, got ${String(pageCount)}`);
-  }
-  if (!Number.isInteger(from) || from < 0 || from >= pageCount) {
-    throw new PdfInputError(`move: page ${String(from)} is out of range`);
   }
   if (!Number.isInteger(to) || to < 0 || to >= pageCount) {
     throw new PdfInputError(`move: target position ${String(to)} is out of range`);
   }
+  for (const index of moving) {
+    if (!Number.isInteger(index) || index < 0 || index >= pageCount) {
+      throw new PdfInputError(`move: page ${String(index)} is out of range`);
+    }
+  }
 
-  const order = Array.from({ length: pageCount }, (_unused, index) => index);
-  const [moved] = order.splice(from, 1);
-  order.splice(to, 0, moved!);
-  return order;
+  const moved = [...new Set(moving)].sort((a, b) => a - b);
+  if (moved.length === 0) return Array.from({ length: pageCount }, (_unused, index) => index);
+
+  const rest = Array.from({ length: pageCount }, (_unused, index) => index).filter(
+    (index) => !moved.includes(index),
+  );
+
+  // Downwards: land after the target. Upwards: land before it.
+  const goingDown = to > Math.max(...moved);
+  const insertAt = rest.filter((index) => (goingDown ? index <= to : index < to)).length;
+
+  return [...rest.slice(0, insertAt), ...moved, ...rest.slice(insertAt)];
+}
+
+/** Single-page form of {@link orderWithPagesMoved}. */
+export function orderWithPageMoved(pageCount: number, from: number, to: number): number[] {
+  return orderWithPagesMoved(pageCount, [from], to);
 }
 
 /**

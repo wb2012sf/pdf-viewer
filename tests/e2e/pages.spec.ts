@@ -267,3 +267,80 @@ test('shows a preview for every page of a long document', async ({ page }) => {
   await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 120_000 });
   await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(200);
 });
+
+test.describe('bulk page selection', () => {
+  test.slow();
+
+  const FIVE_PAGES = fileURLToPath(new URL('./fixtures/five.pdf', import.meta.url));
+
+  async function openFive(page: Page): Promise<void> {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(FIVE_PAGES);
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await page.getByTestId('toggle-pages').click();
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+  }
+
+  test('shift-click selects the run between two pages', async ({ page }) => {
+    await openFive(page);
+
+    await page.getByTestId('page-1').click();
+    await page.getByTestId('page-3').click({ modifiers: ['Shift'] });
+
+    // 2, 3 and 4 — the run, not just the two clicked.
+    await expect(page.getByTestId('page-panel')).toContainText('3 of 5 selected');
+  });
+
+  test('rotates a selected run in one go', async ({ page }) => {
+    await openFive(page);
+    await page.getByTestId('page-1').click();
+    await page.getByTestId('page-3').click({ modifiers: ['Shift'] });
+
+    await page.getByTestId('pages-rotate-right').click();
+
+    for (const index of [1, 2, 3]) {
+      await expect(page.getByTestId(`page-${String(index)}-rotation`)).toHaveText('+90°', { timeout: 60_000 });
+    }
+    await expect(page.getByTestId('page-0-rotation')).toHaveCount(0);
+    await expect(page.getByTestId('page-4-rotation')).toHaveCount(0);
+  });
+
+  test('deletes a selected run in one go', async ({ page }) => {
+    await openFive(page);
+    await page.getByTestId('page-0').click();
+    await page.getByTestId('page-2').click({ modifiers: ['Shift'] });
+
+    await page.getByTestId('pages-delete').click();
+
+    await expect(page.getByTestId('pages-list').locator('li')).toHaveCount(2, { timeout: 60_000 });
+  });
+
+  test("a page's own buttons act on that page alone", async ({ page }) => {
+    // Even with a different selection active.
+    await openFive(page);
+    await page.getByTestId('page-0').click();
+    await page.getByTestId('page-1').click({ modifiers: ['Shift'] });
+
+    await page.getByTestId('page-4-rotate-right').click();
+
+    await expect(page.getByTestId('page-4-rotation')).toHaveText('+90°', { timeout: 60_000 });
+    await expect(page.getByTestId('page-0-rotation')).toHaveCount(0);
+    await expect(page.getByTestId('page-1-rotation')).toHaveCount(0);
+  });
+
+  test('drags a selected run as one block, and the file agrees', async ({ page }) => {
+    await openFive(page);
+    await page.getByTestId('page-0').click();
+    await page.getByTestId('page-1').click({ modifiers: ['Shift'] });
+
+    await dragPage(page, 0, 4);
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+    await viewerSettles(page);
+
+    // Pages 1 and 2 moved to the end: the saved order is 3,4,5,1,2. Page sizes
+    // identify them — the fixture makes page i (100 + i) wide.
+    const saved = await saveAndLoad(page);
+    const widths = saved.getPages().map((p) => Math.round(p.getWidth()) - 100);
+    expect(widths).toEqual([2, 3, 4, 0, 1]);
+  });
+});

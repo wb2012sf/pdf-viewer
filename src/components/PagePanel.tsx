@@ -19,12 +19,17 @@ export interface PagePanelProps {
   selected: ReadonlySet<number>;
   busy: boolean;
   error: string | null;
-  onToggle: (pageIndex: number) => void;
+  /** `extend` means the click was shift-clicked: select the run up to here. */
+  onToggle: (pageIndex: number, extend: boolean) => void;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onRotate: (degrees: 90 | 270) => void;
   onDelete: () => void;
-  onMove: (from: number, to: number) => void;
+  onMove: (from: readonly number[], to: number) => void;
+  /** Rotate one page from its own controls, whatever is selected. */
+  onRotatePage: (pageIndex: number, degrees: 90 | 270) => void;
+  /** Delete one page from its own controls, whatever is selected. */
+  onDeletePage: (pageIndex: number) => void;
   onExtract: () => void;
   onMerge: () => void;
   onSplit: () => void;
@@ -56,6 +61,8 @@ export function PagePanel({
   onRotate,
   onDelete,
   onMove,
+  onRotatePage,
+  onDeletePage,
   onExtract,
   onMerge,
   onSplit,
@@ -202,7 +209,12 @@ export function PagePanel({
                 event.preventDefault();
                 const from = dragging ?? Number(event.dataTransfer.getData('text/plain'));
                 endDrag();
-                if (Number.isInteger(from) && from !== index) onMove(from, index);
+                if (!Number.isInteger(from)) return;
+
+                // Dragging a page that is part of the selection moves the whole
+                // selection; dragging one outside it moves just that page.
+                const block = selected.has(from) ? [...selected].sort((a, b) => a - b) : [from];
+                if (!block.includes(index)) onMove(block, index);
               }}
               onDragEnd={endDrag}
             >
@@ -210,7 +222,13 @@ export function PagePanel({
                 <input
                   type="checkbox"
                   checked={selected.has(index)}
-                  onChange={() => onToggle(index)}
+                  // Shift-click selects the whole run from the last page
+                  // clicked, which is how every other list of things behaves.
+                  // `onChange` cannot see the shift key, so the click is what
+                  // reports — and it must not preventDefault, or the box stops
+                  // agreeing with the state that drives it.
+                  onClick={(event) => onToggle(index, event.shiftKey)}
+                  onChange={() => undefined}
                   disabled={busy}
                   data-testid={`page-${String(index)}`}
                 />
@@ -235,6 +253,41 @@ export function PagePanel({
                   )}
                 </span>
               </label>
+
+              {/* Per-page controls, so a single page needs no round trip
+                  through ticking it first. They act on this page alone even
+                  when others are selected — the page they sit on is the one
+                  being pointed at. */}
+              <span className="pages__page-actions">
+                <button
+                  type="button"
+                  onClick={() => onRotatePage(index, 270)}
+                  disabled={busy}
+                  aria-label={`Rotate page ${String(index + 1)} anticlockwise`}
+                  data-testid={`page-${String(index)}-rotate-left`}
+                >
+                  ⟲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRotatePage(index, 90)}
+                  disabled={busy}
+                  aria-label={`Rotate page ${String(index + 1)} clockwise`}
+                  data-testid={`page-${String(index)}-rotate-right`}
+                >
+                  ⟳
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeletePage(index)}
+                  // The last page cannot go: a document with none opens nowhere.
+                  disabled={busy || count < 2}
+                  aria-label={`Delete page ${String(index + 1)}`}
+                  data-testid={`page-${String(index)}-delete`}
+                >
+                  ✕
+                </button>
+              </span>
             </li>
           );
         })}
