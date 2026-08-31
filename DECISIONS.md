@@ -95,6 +95,14 @@ One line per assumption made instead of interrupting a session, newest last.
   E2E tests locate controls by `aria-label` and click real screen coordinates: Playwright's actionability
   checks cannot drive the component's internals (a `getByTitle(...).click()` simply times out).
 
+- 2026-08-31 — `useOcr.run` takes a function that yields the bytes rather than the bytes themselves, so that
+  reading the document out of the viewer happens inside the hook's guarded region. A failure there is then
+  reported the same way any other OCR failure is, instead of escaping as an unhandled rejection.
+- 2026-08-31 — Save reports a read failure in the toolbar and writes nothing. Handing over a copy that silently
+  lacks the user's recent work would be worse than refusing, so there is no fallback to the opened bytes.
+- 2026-08-31 — `App` is unit-tested with the viewer mocked out. The real one needs a browser, WASM and a canvas;
+  the only part `App` talks to is the registry, so a stub of that exercises the whole error path.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

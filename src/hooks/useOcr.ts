@@ -14,9 +14,23 @@ export interface OcrState {
 
 const IDLE: OcrState = { status: 'idle', progress: null, wordsAdded: null, error: null };
 
+/**
+ * Supplies the document to recognize.
+ *
+ * A function rather than the bytes themselves, because reading the current
+ * document out of the viewer can fail too — and a failure there belongs in the
+ * same place the user is already watching for OCR to finish, not in an
+ * unhandled rejection.
+ */
+export type PdfBytesSource = () => Promise<Uint8Array>;
+
 export interface UseOcrResult extends OcrState {
   /** Resolves with the searchable PDF, or null if the run failed or was cancelled. */
-  run: (engine: PdfEngine, pdfBytes: Uint8Array, options?: MakeSearchableOptions) => Promise<Uint8Array | null>;
+  run: (
+    engine: PdfEngine,
+    source: PdfBytesSource,
+    options?: MakeSearchableOptions,
+  ) => Promise<Uint8Array | null>;
   cancel: () => void;
   reset: () => void;
 }
@@ -34,7 +48,7 @@ export function useOcr(): UseOcrResult {
   const run = useCallback(
     async (
       engine: PdfEngine,
-      pdfBytes: Uint8Array,
+      source: PdfBytesSource,
       options: MakeSearchableOptions = {},
     ): Promise<Uint8Array | null> => {
       abortRef.current?.abort();
@@ -44,6 +58,9 @@ export function useOcr(): UseOcrResult {
       setState({ status: 'running', progress: null, wordsAdded: null, error: null });
 
       try {
+        // Inside the try: reading the document can fail, and that failure has
+        // to reach the user the same way any other OCR failure does.
+        const pdfBytes = await source();
         const result = await makeSearchable(engine, pdfBytes, {
           ...options,
           signal: controller.signal,

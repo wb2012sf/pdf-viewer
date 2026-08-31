@@ -11,9 +11,11 @@ import type { ExportPlugin } from '@embedpdf/plugin-export';
  * a user only discovers later, in a file they thought they had saved.
  */
 export async function currentDocumentBytes(registry: PluginRegistry): Promise<Uint8Array> {
+  // This message is shown to the user, so it says what it means for them
+  // rather than naming the plugin that is missing.
   const exporter = registry.getPlugin<ExportPlugin>('export');
   if (!exporter) {
-    throw new Error('viewer: the export plugin is not available, so the document cannot be read back');
+    throw new Error('Could not read the document back from the viewer: its export component is unavailable.');
   }
 
   const buffer = await exporter.provides().saveAsCopy().toPromise();

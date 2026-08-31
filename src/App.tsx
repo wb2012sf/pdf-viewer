@@ -25,6 +25,7 @@ function openDocumentFrom(name: string, bytes: Uint8Array): OpenDocument {
 export function App(): React.JSX.Element {
   const [document, setDocument] = useState<OpenDocument | null>(null);
   const [registry, setRegistry] = useState<PluginRegistry | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const ocr = useOcr();
 
   const engine = registry?.getEngine() ?? null;
@@ -42,6 +43,7 @@ export function App(): React.JSX.Element {
   // reference that is about to be torn down; `onReady` supplies the new one.
   const replaceDocument = useCallback((next: OpenDocument): void => {
     setRegistry(null);
+    setSaveError(null);
     setDocument(next);
   }, []);
 
@@ -58,11 +60,11 @@ export function App(): React.JSX.Element {
   const handleRunOcr = useCallback(async () => {
     if (!registry || !engine || !document) return;
 
-    // Read the document back out of the viewer first. Anything annotated since
-    // it was opened lives in the viewer's state, and OCRing the bytes the file
-    // arrived as would quietly discard it.
-    const current = await currentDocumentBytes(registry);
-    const searchable = await runOcr(engine, current);
+    // Read the document back out of the viewer rather than using the bytes it
+    // was opened with: anything annotated since then lives in the viewer's
+    // state. Passed as a function so that a failure to read it is reported as
+    // an OCR failure instead of escaping unhandled.
+    const searchable = await runOcr(engine, () => currentDocumentBytes(registry));
     if (!searchable) return;
 
     // Reopen the viewer on the result so the new text layer is searchable at
@@ -72,8 +74,18 @@ export function App(): React.JSX.Element {
 
   const handleSave = useCallback(async () => {
     if (!document || !registry) return;
+    setSaveError(null);
 
-    const bytes = await currentDocumentBytes(registry);
+    let bytes: Uint8Array;
+    try {
+      bytes = await currentDocumentBytes(registry);
+    } catch (cause) {
+      // Better to say the file could not be read than to hand the user a copy
+      // that silently lacks everything they just did to it.
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+      return;
+    }
+
     const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'application/pdf' }));
     try {
       const link = window.document.createElement('a');
@@ -106,6 +118,15 @@ export function App(): React.JSX.Element {
               onRun={() => void handleRunOcr()}
               onCancel={ocr.cancel}
             />
+            {saveError !== null && (
+              <span
+                className="workbench__ocr-status workbench__ocr-status--error"
+                role="alert"
+                data-testid="save-error"
+              >
+                {saveError}
+              </span>
+            )}
             <button
               type="button"
               className="workbench__button"
