@@ -268,9 +268,19 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-09-01 — The merge list keeps its ↑/↓ buttons alongside dragging: a drag is not reachable from a keyboard,
   and the arrows are also the only way to move a row by exactly one place without aiming.
 
+- 2026-09-01 — `dragDropEnabled: false` in the Tauri window config. It defaults to true, which routes file
+  drops to Tauri and stops the webview delivering HTML5 drag events — so the drop-to-open added the same day
+  would not have worked in the packaged app at all. Found by reading Tauri's config schema rather than by
+  waiting for the bug report; nothing here uses Tauri's own file-drop event.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
 - File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
   the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
 - The desktop app is verified on Windows only; macOS and Linux are untried.
+- **The desktop app has not been re-verified since that smoke test.** Everything added since — Save as/Close and
+  the unsaved-changes warning, the page panel and its previews, pointer dragging, the merge dialog, dropping
+  files, the export bridge and command overrides, the form-widget patches, the bundled cursive fonts — has only
+  ever run in a browser. The browser and the webview have already differed twice (`<a download>`, and now
+  drag-and-drop), so this is worth a run rather than an assumption.

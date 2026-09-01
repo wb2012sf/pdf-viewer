@@ -116,6 +116,15 @@ which the viewer fails to render at all because its UI refers to commands that
 no longer exist; and `onDocumentOpened`/`onDocumentClosed` only report
 afterwards, which is too late to ask the user anything.
 
+### Dropping files needs Tauri's own drag-drop turned off
+
+`dragDropEnabled` defaults to true, which hands file drops to Tauri and stops
+the webview delivering HTML5 drag events at all — Tauri's own schema says
+"disabling it is required to use HTML5 drag and drop on the frontend on
+Windows". `src-tauri/tauri.conf.json` sets it to `false`, since this app handles
+drops in the page rather than through Tauri's event. Nothing uses Tauri's
+file-drop event, so there is nothing lost.
+
 ### The dropdown arrow
 
 Reported as only appearing after clicking into the field. The arrow is part of
