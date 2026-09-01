@@ -177,9 +177,11 @@ body {
 }
 
 .pages {
+  /* Overridden inline as the panel is resized; these are the fallbacks. */
   --thumb-height: 5.5rem;
   --thumb-max-width: 8rem;
 
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 0 0 15.5rem;
@@ -426,4 +428,143 @@ body {
   color: #fff;
   font-size: 0.875rem;
   pointer-events: none;
+}
+
+/* The panel's trailing edge, wide enough to grab without being visible. */
+.pages__resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 5;
+}
+
+.pages__resizer:hover,
+.pages__resizer:focus-visible {
+  background: var(--workbench-accent);
+  outline: none;
+}
+
+.dialog--merge {
+  width: min(34rem, 90vw);
+  max-width: none;
+}
+
+.merge__list {
+  margin: 0 0 1rem;
+  padding: 0.25rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--workbench-border);
+  border-radius: 0.375rem;
+}
+
+.merge__list--over {
+  border-color: var(--workbench-accent);
+  background: color-mix(in srgb, var(--workbench-accent) 8%, transparent);
+}
+
+.merge__empty {
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+  color: var(--workbench-muted);
+  font-size: 0.875rem;
+}
+
+.merge__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.merge__item + .merge__item {
+  border-top: 1px solid var(--workbench-border);
+}
+
+.merge__position {
+  width: 1.25rem;
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+}
+
+.merge__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.merge__badge {
+  color: var(--workbench-accent);
+  font-size: 0.75rem;
+  font-style: normal;
+}
+
+.merge__pages {
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.merge__item button {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--workbench-border);
+  border-radius: 0.25rem;
+  background: var(--workbench-bg);
+  color: var(--workbench-fg);
+  cursor: pointer;
+}
+
+.merge__item button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.merge__total {
+  flex: 1;
+  color: var(--workbench-muted);
+  font-size: 0.8125rem;
+}
+
+/* The page the viewer is showing. Deliberately quieter than selection: it says
+   where the reader is, not what an operation would act on. */
+.pages__item--current .pages__thumb img {
+  outline: 2px solid var(--workbench-accent);
+  outline-offset: 1px;
+}
+
+.pages__thumb {
+  cursor: pointer;
+}
+
+/* The label now holds only the tick box and the page number; the preview is a
+   sibling, so navigating and selecting stay separate gestures. */
+.pages__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem;
+}
+
+.pages__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.pages__thumb:focus-visible {
+  outline: 2px solid var(--workbench-accent);
+  outline-offset: 2px;
 }

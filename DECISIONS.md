@@ -244,6 +244,23 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-09-01 — A drop is treated as deliberate, so it asks about unsaved work rather than refusing; the files
   are held across the warning and opened once it is answered, rather than making the user find them again.
 
+- 2026-09-01 — The pages panel can be resized by dragging its edge or with the arrow keys, and the preview size
+  is derived from the width. Widening a panel that left the pages the same size would miss the point of
+  widening it.
+- 2026-09-01 — Merge is a dialog of its own, separate from the page panel's Append, because the two answer
+  different questions: Append adds to the document already open, Merge assembles a set from nothing — which is
+  why it works with no document open. With one open it is seeded with that document, read through
+  `currentDocumentBytes` so annotations survive, and that entry cannot be removed: the result replaces it.
+- 2026-09-01 — Page counts are read as each file joins the merge queue, so the dialog can say how large the
+  result will be, and a file that is not a readable PDF is named as it is added rather than taking the whole
+  batch down at the end.
+- 2026-09-01 — The panel marks the page the viewer is showing, and clicking a preview scrolls the viewer to it.
+  The marker is deliberately quieter than selection: where the reader is and what an operation would act on are
+  different questions.
+- 2026-09-01 — The preview was moved out of the `<label>`. Inside it, clicking a preview to navigate also
+  activated the tick box, so looking at a page and choosing it were the same gesture — caught by a test written
+  for exactly that.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

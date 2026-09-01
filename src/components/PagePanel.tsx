@@ -1,8 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Thumbnail } from '../lib/pdf/thumbnails';
+import {
+  DEFAULT_WIDTH_PX,
+  MAX_WIDTH_PX,
+  MIN_WIDTH_PX,
+  clampWidth,
+  thumbHeightFor,
+} from './page-panel-size';
 
 /** Travel before a press counts as a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 5;
+
 
 export interface PagePanelProps {
   /** Rotation currently stored on each page, in document order. */
@@ -20,6 +28,10 @@ export interface PagePanelProps {
   thumbnailsStale: boolean;
   /** Zero-based indices the user has ticked. */
   selected: ReadonlySet<number>;
+  /** The page the viewer is currently showing, marked so the two agree. */
+  currentPage: number | null;
+  /** Asks the viewer to scroll to a page. */
+  onShowPage: (pageIndex: number) => void;
   busy: boolean;
   error: string | null;
   /** `extend` means the click was shift-clicked: select the run up to here. */
@@ -56,9 +68,11 @@ export function PagePanel({
   thumbnails,
   thumbnailsStale,
   selected,
+  currentPage,
   busy,
   error,
   onToggle,
+  onShowPage,
   onSelectAll,
   onClearSelection,
   onRotate,
@@ -71,6 +85,8 @@ export function PagePanel({
   onSplit,
   onClose,
 }: PagePanelProps): React.JSX.Element {
+  const [width, setWidth] = useState(DEFAULT_WIDTH_PX);
+  const resizeFrom = useRef<{ x: number; width: number } | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   /** Where a press started, before it is known whether it is a click or a drag. */
@@ -114,7 +130,16 @@ export function PagePanel({
   }
 
   return (
-    <aside className="pages" aria-label="Pages" data-testid="page-panel">
+    <aside
+      className="pages"
+      aria-label="Pages"
+      data-testid="page-panel"
+      style={{
+        flexBasis: `${String(width)}px`,
+        ['--thumb-height' as string]: `${String(thumbHeightFor(width))}px`,
+        ['--thumb-max-width' as string]: `${String(Math.round(width * 0.62))}px`,
+      }}
+    >
       <header className="pages__head">
         <span className="pages__title">Pages</span>
         <button type="button" className="pages__close" onClick={onClose} aria-label="Close pages panel">
@@ -211,12 +236,14 @@ export function PagePanel({
               className={[
                 'pages__item',
                 selected.has(index) ? 'pages__item--selected' : '',
+                currentPage === index ? 'pages__item--current' : '',
                 dragging === index ? 'pages__item--dragging' : '',
                 dropTarget === index && dragging !== index ? 'pages__item--drop' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
               data-testid={`page-item-${String(index)}`}
+              data-current={currentPage === index ? 'true' : 'false'}
               onPointerDown={(event) => {
                 // Left button only, and not when the press lands on a control.
                 if (busy || event.button !== 0) return;
@@ -263,6 +290,29 @@ export function PagePanel({
                 endDrag();
               }}
             >
+              {/* The preview is outside the label on purpose: inside it, a
+                  click to navigate would also activate the tick box, so
+                  looking at a page and choosing it would be the same gesture. */}
+              <span
+                className="pages__thumb"
+                role="button"
+                tabIndex={0}
+                aria-label={`Show page ${String(index + 1)}`}
+                data-testid={`page-${String(index)}-show`}
+                onClick={() => onShowPage(index)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  onShowPage(index);
+                }}
+              >
+                {thumb ? (
+                  <img src={thumb.url} alt={`Page ${String(index + 1)}`} draggable={false} />
+                ) : (
+                  <span className="pages__thumb-placeholder" aria-hidden="true" />
+                )}
+              </span>
+
               <label className="pages__label">
                 <input
                   type="checkbox"
@@ -277,13 +327,6 @@ export function PagePanel({
                   disabled={busy}
                   data-testid={`page-${String(index)}`}
                 />
-                <span className="pages__thumb">
-                  {thumb ? (
-                    <img src={thumb.url} alt={`Page ${String(index + 1)}`} draggable={false} />
-                  ) : (
-                    <span className="pages__thumb-placeholder" aria-hidden="true" />
-                  )}
-                </span>
                 <span className="pages__number">
                   {index + 1}
                   {turned !== 0 && (
@@ -337,6 +380,40 @@ export function PagePanel({
           );
         })}
       </ol>
+      <div
+        className="pages__resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize pages panel"
+        aria-valuenow={width}
+        aria-valuemin={MIN_WIDTH_PX}
+        aria-valuemax={MAX_WIDTH_PX}
+        tabIndex={0}
+        data-testid="pages-resizer"
+        onPointerDown={(event) => {
+          resizeFrom.current = { x: event.clientX, width };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          event.preventDefault();
+        }}
+        onPointerMove={(event) => {
+          const start = resizeFrom.current;
+          if (!start) return;
+          setWidth(clampWidth(start.width + (event.clientX - start.x)));
+        }}
+        onPointerUp={() => {
+          resizeFrom.current = null;
+        }}
+        onKeyDown={(event) => {
+          // Keyboard resizing, because a drag handle nobody can tab to is not
+          // a control.
+          const step = event.shiftKey ? 48 : 16;
+          if (event.key === 'ArrowLeft') setWidth((current) => clampWidth(current - step));
+          else if (event.key === 'ArrowRight') setWidth((current) => clampWidth(current + step));
+          else return;
+          event.preventDefault();
+        }}
+      />
     </aside>
   );
 }
+

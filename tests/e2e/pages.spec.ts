@@ -375,3 +375,47 @@ test.describe('bulk page selection', () => {
     expect(widths).toEqual([2, 3, 4, 0, 1]);
   });
 });
+
+test.describe('panel sizing and page sync', () => {
+  test.slow();
+
+  const FIVE = fileURLToPath(new URL('./fixtures/five.pdf', import.meta.url));
+
+  async function openPanel(page: Page): Promise<void> {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(FIVE);
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await page.getByTestId('toggle-pages').click();
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+  }
+
+  test('the panel can be dragged wider, and the previews grow with it', async ({ page }) => {
+    await openPanel(page);
+    const before = (await page.getByTestId('page-item-0').locator('img').boundingBox())!;
+
+    const handle = (await page.getByTestId('pages-resizer').boundingBox())!;
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + 160, handle.y + 200, { steps: 8 });
+    await page.mouse.up();
+
+    const after = (await page.getByTestId('page-item-0').locator('img').boundingBox())!;
+    expect(after.height).toBeGreaterThan(before.height);
+  });
+
+  test('marks the page the viewer is showing', async ({ page }) => {
+    await openPanel(page);
+
+    await expect(page.getByTestId('page-item-0')).toHaveAttribute('data-current', 'true', { timeout: 30_000 });
+  });
+
+  test('clicking a preview takes the viewer to that page', async ({ page }) => {
+    await openPanel(page);
+
+    await page.getByTestId('page-3-show').click();
+
+    await expect(page.getByTestId('page-item-3')).toHaveAttribute('data-current', 'true', { timeout: 30_000 });
+    // Navigating is not selecting: the page must not have been ticked.
+    await expect(page.getByTestId('page-panel')).not.toContainText('selected');
+  });
+});

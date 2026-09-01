@@ -21,6 +21,8 @@ function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
     thumbnails: thumbsFor(3),
     thumbnailsStale: false,
     selected: new Set<number>(),
+    currentPage: null,
+    onShowPage: vi.fn(),
     busy: false,
     error: null,
     onToggle: vi.fn(),
@@ -353,5 +355,100 @@ describe('PagePanel errors', () => {
     renderPanel();
 
     expect(screen.queryByTestId('pages-error')).toBeNull();
+  });
+});
+
+describe('PagePanel resizing', () => {
+  it('widens as the handle is dragged, and the previews grow with it', () => {
+    renderPanel();
+    const panel = screen.getByTestId('page-panel');
+    const before = panel.style.getPropertyValue('--thumb-height');
+
+    const resizer = screen.getByTestId('pages-resizer');
+    fireEvent.pointerDown(resizer, { clientX: 250 });
+    fireEvent.pointerMove(resizer, { clientX: 400 });
+    fireEvent.pointerUp(resizer, { clientX: 400 });
+
+    // Widening the panel has to make the pages bigger — otherwise it just
+    // leaves them marooned in a wider column.
+    expect(parseInt(panel.style.flexBasis, 10)).toBeGreaterThan(300);
+    expect(parseInt(panel.style.getPropertyValue('--thumb-height'), 10)).toBeGreaterThan(
+      parseInt(before, 10),
+    );
+  });
+
+  it('will not be dragged narrower than it is usable', () => {
+    renderPanel();
+    const resizer = screen.getByTestId('pages-resizer');
+
+    fireEvent.pointerDown(resizer, { clientX: 250 });
+    fireEvent.pointerMove(resizer, { clientX: -500 });
+    fireEvent.pointerUp(resizer, { clientX: -500 });
+
+    expect(parseInt(screen.getByTestId('page-panel').style.flexBasis, 10)).toBeGreaterThanOrEqual(170);
+  });
+
+  it('will not be dragged wide enough to swallow the viewer', () => {
+    renderPanel();
+    const resizer = screen.getByTestId('pages-resizer');
+
+    fireEvent.pointerDown(resizer, { clientX: 250 });
+    fireEvent.pointerMove(resizer, { clientX: 5000 });
+    fireEvent.pointerUp(resizer, { clientX: 5000 });
+
+    expect(parseInt(screen.getByTestId('page-panel').style.flexBasis, 10)).toBeLessThanOrEqual(560);
+  });
+
+  it('resizes from the keyboard, so the handle is not mouse-only', () => {
+    renderPanel();
+    const resizer = screen.getByTestId('pages-resizer');
+    const before = parseInt(screen.getByTestId('page-panel').style.flexBasis, 10);
+
+    fireEvent.keyDown(resizer, { key: 'ArrowRight' });
+
+    expect(parseInt(screen.getByTestId('page-panel').style.flexBasis, 10)).toBeGreaterThan(before);
+  });
+
+  it('reports its size for assistive technology', () => {
+    renderPanel();
+    const resizer = screen.getByTestId('pages-resizer');
+
+    expect(resizer.getAttribute('role')).toBe('separator');
+    expect(resizer.getAttribute('aria-valuenow')).toBeTruthy();
+  });
+});
+
+describe('PagePanel and the viewer', () => {
+  it('marks the page the viewer is showing', () => {
+    // Distinct from selection: what the reader is looking at is not the same
+    // question as what an operation would act on.
+    renderPanel({ currentPage: 1, selected: new Set([2]) });
+
+    expect(screen.getByTestId('page-item-1').getAttribute('data-current')).toBe('true');
+    expect(screen.getByTestId('page-item-2').getAttribute('data-current')).toBe('false');
+  });
+
+  it('marks nothing when the viewer has not said', () => {
+    renderPanel({ currentPage: null });
+
+    expect(screen.getByTestId('page-item-0').getAttribute('data-current')).toBe('false');
+  });
+
+  it('asks the viewer to show a page when its preview is clicked', () => {
+    const { onShowPage } = renderPanel();
+
+    fireEvent.click(screen.getByTestId('page-2-show'));
+
+    expect(onShowPage).toHaveBeenCalledWith(2);
+  });
+
+  it('does not tick a page just because it was shown', () => {
+    // Navigating and selecting are different intentions.
+    const { onShowPage, onToggle } = renderPanel();
+
+    fireEvent.click(screen.getByTestId('page-1-show'));
+
+    expect(onShowPage).toHaveBeenCalledWith(1);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

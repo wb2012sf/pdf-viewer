@@ -4,11 +4,13 @@ import type { PluginRegistry } from '@embedpdf/core';
 import { OpenPdfButton, type OpenPdfHandle } from './components/OpenPdfButton';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { DropZone } from './components/DropZone';
+import { MergeDialog } from './components/MergeDialog';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { useOcr } from './hooks/useOcr';
 import { usePageOps, type PageOperation } from './hooks/usePageOps';
 import { useThumbnails } from './hooks/useThumbnails';
+import { useMergeQueue } from './hooks/useMergeQueue';
 import {
   extractPages,
   getPageRotations,
@@ -27,6 +29,7 @@ import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
 import { bridgeViewerExport } from './lib/viewer/export-bridge';
 import { overrideDocumentCommands, type DocumentCommandHandlers } from './lib/viewer/document-commands';
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
+import { showPageInViewer, watchViewerPage } from './lib/viewer/page-sync';
 
 interface OpenDocument {
   name: string;
@@ -65,8 +68,13 @@ export function App(): React.JSX.Element {
   /** How far each page has been turned since the document was opened. */
   const [turnedBy, setTurnedBy] = useState<number[]>([]);
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  /** The page the viewer is showing, so the panel can mark it. */
+  const [currentPage, setCurrentPage] = useState<number | null>(null);
   const ocr = useOcr();
   const pageOps = usePageOps();
+  const mergeQueue = useMergeQueue();
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [merging, setMerging] = useState(false);
   const mergeInputRef = useRef<HTMLInputElement>(null);
   const openPdfRef = useRef<OpenPdfHandle>(null);
   // Split produces several documents where a page operation yields one, so the
@@ -121,6 +129,10 @@ export function App(): React.JSX.Element {
       onClose: () => documentCommands.current.onClose(),
     });
   }, [registry]);
+
+  // Follow the page the viewer is showing, so the panel marks it as the reader
+  // scrolls rather than drifting out of step with the document.
+  useEffect(() => watchViewerPage(registry, setCurrentPage), [registry]);
 
   // The viewer's own Export command is a dead menu item inside the desktop
   // app; this answers it there. Harmless in a browser, where it does nothing.
@@ -342,6 +354,38 @@ export function App(): React.JSX.Element {
     [runPageOp, rotations.length],
   );
 
+  const handleMergeQueue = useCallback(async () => {
+    setMerging(true);
+    try {
+      const combined = await mergePdfs(mergeQueue.items.map((item) => item.bytes));
+      const named = mergeQueue.items[0]?.name ?? 'merged.pdf';
+      setMergeOpen(false);
+      mergeQueue.clear();
+      // Edited, not freshly opened: the result exists nowhere on disk yet.
+      replaceDocument(openDocumentFrom(named, combined), true);
+    } catch (cause) {
+      mergeQueue.setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setMerging(false);
+    }
+  }, [mergeQueue, replaceDocument]);
+
+  /** Opens the merge dialog, seeded with the document already open. */
+  const openMergeDialog = useCallback(async () => {
+    if (!registry || !document) {
+      mergeQueue.open();
+    } else {
+      // The document as it stands, so anything annotated since it was opened
+      // survives into the merged result.
+      try {
+        mergeQueue.open({ name: document.name, bytes: await currentDocumentBytes(registry) });
+      } catch {
+        mergeQueue.open({ name: document.name, bytes: document.bytes });
+      }
+    }
+    setMergeOpen(true);
+  }, [registry, document, mergeQueue]);
+
   const handleSave = useCallback(async (): Promise<SaveResult> => {
     if (!document || !registry) return 'failed';
     setSaveError(null);
@@ -499,12 +543,36 @@ export function App(): React.JSX.Element {
           </>
         )}
 
+        <button
+          type="button"
+          className="workbench__button"
+          onClick={() => void openMergeDialog()}
+          data-testid="open-merge"
+        >
+          Merge…
+        </button>
         <OpenPdfButton
           ref={openPdfRef}
           onOpen={(file) => void handleOpen([file])}
           beforeOpen={() => requestAction('open')}
         />
       </header>
+
+      {mergeOpen && (
+        <MergeDialog
+          items={mergeQueue.items}
+          busy={merging}
+          error={mergeQueue.error}
+          onAddFiles={(files) => void mergeQueue.addFiles(files)}
+          onRemove={mergeQueue.remove}
+          onMove={mergeQueue.move}
+          onMerge={() => void handleMergeQueue()}
+          onCancel={() => {
+            setMergeOpen(false);
+            mergeQueue.clear();
+          }}
+        />
+      )}
 
       {pending !== null && (
         <ConfirmDialog
@@ -559,6 +627,8 @@ export function App(): React.JSX.Element {
             onSelectAll={() => setSelected(new Set(rotations.map((_unused, index) => index)))}
             onClearSelection={() => setSelected(new Set())}
             turnedBy={turnedBy}
+            currentPage={currentPage}
+            onShowPage={(pageIndex) => showPageInViewer(registry, pageIndex)}
             thumbnails={thumbnails.thumbnails}
             thumbnailsStale={thumbnails.stale}
             onRotate={(degrees) => void runPageOp((bytes) => rotatePages(bytes, selectedPages, degrees))}
