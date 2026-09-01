@@ -273,11 +273,19 @@ One line per assumption made instead of interrupting a session, newest last.
   would not have worked in the packaged app at all. Found by reading Tauri's config schema rather than by
   waiting for the bug report; nothing here uses Tauri's own file-drop event.
 
+- 2026-09-01 — `render: { withForms: true, withAnnotations: true }`. `withForms` defaults to **false**, and
+  PDFium draws static appearance streams and interactive form widgets in separate passes — so form widgets were
+  never drawn at all. That is what made a Submit button invisible, and is the likeliest explanation for a combo
+  box having no dropdown arrow. Found by chasing the arrow report after the user checked the same file in
+  Acrobat and saw the arrow there, which disproved the earlier guess that it was the document.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
-- File-select fields and push buttons are not rendered by the viewer, and neither is patchable from outside it
-  the way max-length and the multiline font were. See `KNOWN-ISSUES.md`.
+- File-select fields have no picker, and push buttons — now drawn, since `withForms` was switched on — still
+  have no control behind them, so they cannot be pressed. See `KNOWN-ISSUES.md`.
+- Whether the dropdown arrow is fixed is unconfirmed: the fixture cannot show it either way, so it needs a
+  document authored by a real form tool.
 - The desktop app is verified on Windows only; macOS and Linux are untried.
 - **The desktop app has not been re-verified since that smoke test.** Everything added since — Save as/Close and
   the unsaved-changes warning, the page panel and its previews, pointer dragging, the merge dialog, dropping

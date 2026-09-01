@@ -131,8 +131,9 @@ test.describe('form field types', () => {
     await expect(widget(page, 'field.attachment')).toHaveAttribute('type', 'file', { timeout: 5000 });
   });
 
-  test.fail('KNOWN ISSUE: a push button is not rendered at all', async ({ page }) => {
-    // A Submit button in the PDF produces no widget, so it cannot be pressed.
+  test.fail('KNOWN ISSUE: a push button cannot be pressed', async ({ page }) => {
+    // It is drawn now — `render.withForms` was off, which is why it used to be
+    // invisible as well — but there is still no control behind it to click.
     await openFormTypes(page);
 
     await expect(widget(page, 'field.submit')).toBeAttached({ timeout: 5000 });

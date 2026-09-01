@@ -54,6 +54,12 @@ export function offlineViewerConfig(src: string): PDFViewerConfig {
       signature: SIGNATURE_FONTS,
     },
 
+    // PDFium draws a page's static appearance streams and its *interactive*
+    // form widgets in separate passes, and the second is off by default. Without
+    // it a combo box has no dropdown arrow and a field no focus chrome — the
+    // page looks like a printout of the form rather than a form.
+    render: { withForms: true, withAnnotations: true },
+
     // The standard stamp gallery, supplied directly from the bundle instead of
     // being fetched. `manifests` must be cleared as well: it is a separate
     // option that still points at jsDelivr, and leaving it at its default
