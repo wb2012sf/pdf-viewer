@@ -566,6 +566,7 @@ export function App(): React.JSX.Element {
           onAddFiles={(files) => void mergeQueue.addFiles(files)}
           onRemove={mergeQueue.remove}
           onMove={mergeQueue.move}
+          onReorder={mergeQueue.reorder}
           onMerge={() => void handleMergeQueue()}
           onCancel={() => {
             setMergeOpen(false);

@@ -568,3 +568,17 @@ body {
   outline: 2px solid var(--workbench-accent);
   outline-offset: 2px;
 }
+
+.merge__item {
+  cursor: grab;
+  touch-action: none;
+}
+
+.merge__item--dragging {
+  opacity: 0.4;
+}
+
+/* Where the dragged document would land. */
+.merge__item--drop {
+  box-shadow: inset 0 2px 0 0 var(--workbench-accent);
+}

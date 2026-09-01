@@ -133,3 +133,51 @@ test.describe('merge dialog', () => {
     await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
   });
 });
+
+test.describe('merge list drag reordering', () => {
+  test.slow();
+
+  /** Drags one queued document onto another with a real mouse. */
+  async function dragRow(page: Page, from: number, to: number): Promise<void> {
+    const source = (await page.getByTestId(`merge-item-${String(from)}`).boundingBox())!;
+    const target = (await page.getByTestId(`merge-item-${String(to)}`).boundingBox())!;
+    const startX = source.x + source.width / 3;
+    const startY = source.y + source.height / 2;
+    const endY = target.y + target.height / 2;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    for (let step = 1; step <= 6; step += 1) {
+      await page.mouse.move(startX, startY + ((endY - startY) * step) / 6);
+    }
+    await page.mouse.up();
+  }
+
+  test('drags a document into a new position, and merges in that order', async ({ page }) => {
+    await openMergeDialog(page);
+    await page.getByTestId('merge-dialog-input').setInputFiles([SAMPLE_PDF, FIVE_PDF]);
+    await expect(page.getByTestId('merge-total')).toHaveText('7 pages in 2 files', { timeout: 30_000 });
+
+    await dragRow(page, 1, 0);
+
+    await expect(page.getByTestId('merge-item-0')).toContainText('five.pdf');
+    await page.getByTestId('merge-confirm').click();
+
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    const merged = await saveAndLoad(page);
+    // five.pdf leads now, so page 1 is one of its narrow pages.
+    expect(Math.round(merged.getPage(0).getWidth())).toBe(100);
+  });
+
+  test('a press on a row button does not start a drag', async ({ page }) => {
+    await openMergeDialog(page);
+    await page.getByTestId('merge-dialog-input').setInputFiles([SAMPLE_PDF, FIVE_PDF]);
+    await expect(page.getByTestId('merge-item-1')).toBeVisible({ timeout: 30_000 });
+
+    // Pressing ↓ on the first row should move it, not drag it somewhere else.
+    await page.getByTestId('merge-down-0').click();
+
+    await expect(page.getByTestId('merge-item-0')).toContainText('five.pdf');
+    await expect(page.getByTestId('merge-item-1')).toContainText('sample.pdf');
+  });
+});

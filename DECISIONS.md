@@ -261,6 +261,13 @@ One line per assumption made instead of interrupting a session, newest last.
   activated the tick box, so looking at a page and choosing it were the same gesture — caught by a test written
   for exactly that.
 
+- 2026-09-01 — Pointer-based list dragging is now one hook (`useListDrag`), used by both the page panel and the
+  merge list. The second use was the moment to stop copying it.
+- 2026-09-01 — The hook takes the list ref rather than returning one. A ref handed back from a hook and read
+  during render is indistinguishable, to the React compiler lint, from reading its `.current`.
+- 2026-09-01 — The merge list keeps its ↑/↓ buttons alongside dragging: a drag is not reachable from a keyboard,
+  and the arrows are also the only way to move a row by exactly one place without aiming.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

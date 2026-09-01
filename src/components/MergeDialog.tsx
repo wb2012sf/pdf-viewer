@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useListDrag } from '../hooks/useListDrag';
 
 /** One document queued for merging, in the order it will appear. */
 export interface MergeItem {
@@ -18,6 +19,8 @@ export interface MergeDialogProps {
   onAddFiles: (files: File[]) => void;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
+  /** Drag reordering: the row picked up, and the row it was dropped on. */
+  onReorder: (from: number, to: number) => void;
   onMerge: () => void;
   onCancel: () => void;
 }
@@ -36,12 +39,21 @@ export function MergeDialog({
   onAddFiles,
   onRemove,
   onMove,
+  onReorder,
   onMerge,
   onCancel,
 }: MergeDialogProps): React.JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
   const [over, setOver] = useState(false);
+  const listRef = useRef<HTMLOListElement>(null);
+  const drag = useListDrag({
+    listRef,
+    disabled: busy,
+    onDrop: (from, to) => {
+      if (from !== to) onReorder(from, to);
+    },
+  });
 
   useEffect(() => {
     addRef.current?.focus();
@@ -67,7 +79,8 @@ export function MergeDialog({
       >
         <h2 className="dialog__title">Merge documents</h2>
         <p className="dialog__message">
-          They are combined top to bottom. Add as many as you like, then put them in the order you want.
+          They are combined top to bottom. Add as many as you like, then drag them into the order you want —
+          the arrows do the same thing from the keyboard.
         </p>
 
         <input
@@ -85,6 +98,7 @@ export function MergeDialog({
         />
 
         <ol
+          ref={listRef}
           className={`merge__list${over ? ' merge__list--over' : ''}`}
           data-testid="merge-list"
           onDragOver={(event) => {
@@ -110,7 +124,18 @@ export function MergeDialog({
           )}
 
           {items.map((item, index) => (
-            <li key={item.id} className="merge__item" data-testid={`merge-item-${String(index)}`}>
+            <li
+              key={item.id}
+              className={[
+                'merge__item',
+                drag.dragging === index ? 'merge__item--dragging' : '',
+                drag.dropTarget === index && drag.dragging !== index ? 'merge__item--drop' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              data-testid={`merge-item-${String(index)}`}
+              {...drag.rowHandlers(index)}
+            >
               <span className="merge__position">{index + 1}</span>
               <span className="merge__name" title={item.name}>
                 {item.name}

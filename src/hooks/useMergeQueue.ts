@@ -12,6 +12,8 @@ export interface MergeQueue {
   addFiles: (files: readonly File[]) => Promise<void>;
   remove: (id: string) => void;
   move: (id: string, direction: -1 | 1) => void;
+  /** Moves the document at `from` to sit at `to`, for drag reordering. */
+  reorder: (from: number, to: number) => void;
   clear: () => void;
   setError: (message: string | null) => void;
 }
@@ -78,10 +80,23 @@ export function useMergeQueue(): MergeQueue {
     });
   }, []);
 
+  const reorder = useCallback((from: number, to: number) => {
+    setItems((current) => {
+      if (from < 0 || to < 0 || from >= current.length || to >= current.length) return current;
+
+      // Lift it out and put it back at the target's position, which is what a
+      // dragged row visibly does.
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved!);
+      return next;
+    });
+  }, []);
+
   const clear = useCallback(() => {
     setItems([]);
     setError(null);
   }, []);
 
-  return { items, error, open, addFiles, remove, move, clear, setError };
+  return { items, error, open, addFiles, remove, move, reorder, clear, setError };
 }

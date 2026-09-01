@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Thumbnail } from '../lib/pdf/thumbnails';
+import { useListDrag } from '../hooks/useListDrag';
 import {
   DEFAULT_WIDTH_PX,
   MAX_WIDTH_PX,
@@ -7,9 +8,6 @@ import {
   clampWidth,
   thumbHeightFor,
 } from './page-panel-size';
-
-/** Travel before a press counts as a drag rather than a click. */
-const DRAG_THRESHOLD_PX = 5;
 
 
 export interface PagePanelProps {
@@ -87,31 +85,18 @@ export function PagePanel({
 }: PagePanelProps): React.JSX.Element {
   const [width, setWidth] = useState(DEFAULT_WIDTH_PX);
   const resizeFrom = useRef<{ x: number; width: number } | null>(null);
-  const [dragging, setDragging] = useState<number | null>(null);
-  const [dropTarget, setDropTarget] = useState<number | null>(null);
-  /** Where a press started, before it is known whether it is a click or a drag. */
-  const dragStart = useRef<{ index: number; x: number; y: number } | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
+  const drag = useListDrag({
+    listRef,
+    disabled: busy,
+    onDrop: (from, to) => {
+      // Dragging a page that is part of the selection moves the whole
+      // selection; dragging one outside it moves just that page.
+      const block = selected.has(from) ? [...selected].sort((a, b) => a - b) : [from];
+      if (!block.includes(to)) onMove(block, to);
+    },
+  });
 
-  /**
-   * Which page sits under a point.
-   *
-   * Reordering is done with pointer events rather than HTML5 drag-and-drop.
-   * Native drag refused to start from the preview image at all, and it cannot be
-   * driven by real mouse movement in a test — so a passing test proved nothing
-   * about whether a person could actually drag a page. Pointer events work with
-   * a mouse, work on touch, and can be tested the way they are really used.
-   */
-  function pageUnder(clientX: number, clientY: number): number | null {
-    const items = listRef.current?.querySelectorAll('li') ?? [];
-    for (const [index, item] of Array.from(items).entries()) {
-      const box = item.getBoundingClientRect();
-      if (clientY >= box.top && clientY <= box.bottom && clientX >= box.left && clientX <= box.right) {
-        return index;
-      }
-    }
-    return null;
-  }
 
   const count = rotations.length;
   const hasSelection = selected.size > 0;
@@ -124,10 +109,6 @@ export function PagePanel({
   // Splitting before page 1 alone would just reproduce the document.
   const canSplit = [...selected].some((index) => index > 0);
 
-  function endDrag(): void {
-    setDragging(null);
-    setDropTarget(null);
-  }
 
   return (
     <aside
@@ -237,58 +218,14 @@ export function PagePanel({
                 'pages__item',
                 selected.has(index) ? 'pages__item--selected' : '',
                 currentPage === index ? 'pages__item--current' : '',
-                dragging === index ? 'pages__item--dragging' : '',
-                dropTarget === index && dragging !== index ? 'pages__item--drop' : '',
+                drag.dragging === index ? 'pages__item--dragging' : '',
+                drag.dropTarget === index && drag.dragging !== index ? 'pages__item--drop' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
               data-testid={`page-item-${String(index)}`}
               data-current={currentPage === index ? 'true' : 'false'}
-              onPointerDown={(event) => {
-                // Left button only, and not when the press lands on a control.
-                if (busy || event.button !== 0) return;
-                if ((event.target as HTMLElement).closest('button, input')) return;
-
-                dragStart.current = { index, x: event.clientX, y: event.clientY };
-              }}
-              onPointerMove={(event) => {
-                const start = dragStart.current;
-                if (!start) return;
-
-                // A few pixels of travel before this counts as a drag, so a
-                // plain click on a page is never mistaken for one.
-                if (
-                  dragging === null &&
-                  Math.hypot(event.clientX - start.x, event.clientY - start.y) < DRAG_THRESHOLD_PX
-                ) {
-                  return;
-                }
-                if (dragging === null) {
-                  setDragging(start.index);
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }
-                setDropTarget(pageUnder(event.clientX, event.clientY));
-              }}
-              onPointerUp={(event) => {
-                const start = dragStart.current;
-                dragStart.current = null;
-                if (dragging === null || start === null) return;
-
-                const over = pageUnder(event.clientX, event.clientY);
-                endDrag();
-                if (over === null) return;
-
-                // Dragging a page that is part of the selection moves the whole
-                // selection; dragging one outside it moves just that page.
-                const block = selected.has(start.index)
-                  ? [...selected].sort((a, b) => a - b)
-                  : [start.index];
-                if (!block.includes(over)) onMove(block, over);
-              }}
-              onPointerCancel={() => {
-                dragStart.current = null;
-                endDrag();
-              }}
+              {...drag.rowHandlers(index)}
             >
               {/* The preview is outside the label on purpose: inside it, a
                   click to navigate would also activate the tick box, so

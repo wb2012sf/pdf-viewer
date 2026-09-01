@@ -83,8 +83,8 @@ beforehand survive. The viewer reopens on the result, and nothing is written to 
 
 Extract is the exception: it produces a new file alongside the original rather than replacing what is open.
 
-**Merge…** in the toolbar assembles several documents into one, in an order you set, and works with nothing
-open at all — that is the case Append cannot serve. Drop PDFs anywhere in the window to open them; several at
+**Merge…** in the toolbar assembles several documents into one, in an order you set by dragging them (or with
+the ↑/↓ buttons), and works with nothing open at all — that is the case Append cannot serve. Drop PDFs anywhere in the window to open them; several at
 once opens the first with the rest appended.
 
 ## OCR
