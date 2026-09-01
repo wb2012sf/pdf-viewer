@@ -452,3 +452,95 @@ describe('PagePanel and the viewer', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 });
+
+describe('reordering without dragging', () => {
+  it('moves the selected pages up one', () => {
+    const props = renderPanel({ selected: new Set([1]) });
+
+    fireEvent.click(screen.getByTestId('pages-move-up'));
+
+    // Upward moves settle *before* the target, so page 1 lands ahead of page 0.
+    expect(props.onMove).toHaveBeenCalledWith([1], 0);
+  });
+
+  it('moves the selected pages down one', () => {
+    const props = renderPanel({ selected: new Set([1]) });
+
+    fireEvent.click(screen.getByTestId('pages-move-down'));
+
+    // Downward moves settle *after* the target.
+    expect(props.onMove).toHaveBeenCalledWith([1], 2);
+  });
+
+  it('moves a whole block as one, from its own edges', () => {
+    const props = renderPanel({ selected: new Set([1, 2]) });
+
+    fireEvent.click(screen.getByTestId('pages-move-up'));
+
+    // The block travels together and is measured from its first page, not from
+    // whichever page happened to be ticked last.
+    expect(props.onMove).toHaveBeenCalledWith([1, 2], 0);
+  });
+
+  it('will not move the first page up or the last page down', () => {
+    renderPanel({ selected: new Set([0]) });
+    expect(button('pages-move-up').disabled).toBe(true);
+    expect(button('pages-move-down').disabled).toBe(false);
+
+    cleanup();
+    renderPanel({ selected: new Set([2]) });
+    expect(button('pages-move-up').disabled).toBe(false);
+    expect(button('pages-move-down').disabled).toBe(true);
+  });
+
+  it('offers nothing to move while no page is ticked', () => {
+    renderPanel();
+
+    expect(button('pages-move-up').disabled).toBe(true);
+    expect(button('pages-move-down').disabled).toBe(true);
+  });
+});
+
+describe('showing where a dragged page will land', () => {
+  /** Presses on `from` and moves to `to` without releasing. */
+  function dragTo(from: number, to: number): void {
+    const source = screen.getByTestId(`page-item-${String(from)}`);
+    const items = screen.getByTestId('pages-list').querySelectorAll('li');
+    items.forEach((item, index) => {
+      item.getBoundingClientRect = () =>
+        ({ top: index * 100, bottom: index * 100 + 99, left: 0, right: 200 }) as DOMRect;
+    });
+
+    fireEvent.pointerDown(source, { button: 0, clientX: 10, clientY: from * 100 + 10 });
+    fireEvent.pointerMove(source, { clientX: 10, clientY: to * 100 + 10 });
+  }
+
+  it('marks the edge below the target when dragging downwards', () => {
+    // The insertion line has to agree with where the page actually goes, and a
+    // page dragged downwards settles *after* the row it is dropped on. A line
+    // above that row would point at the wrong gap.
+    renderPanel();
+
+    dragTo(0, 2);
+
+    expect(screen.getByTestId('page-item-2').className).toContain('pages__item--drop-after');
+  });
+
+  it('marks the edge above the target when dragging upwards', () => {
+    renderPanel();
+
+    dragTo(2, 0);
+
+    expect(screen.getByTestId('page-item-0').className).toContain('pages__item--drop-before');
+  });
+
+  it('marks nothing until the pointer has actually travelled', () => {
+    // A plain click on a page navigates to it; it must not flash an insertion
+    // line on the way.
+    renderPanel();
+
+    dragTo(1, 1);
+
+    expect(screen.getByTestId('pages-list').innerHTML).not.toContain('pages__item--drop');
+  });
+});

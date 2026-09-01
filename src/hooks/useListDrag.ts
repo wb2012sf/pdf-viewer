@@ -15,6 +15,16 @@ export interface ListDrag {
   dragging: number | null;
   /** Index the pointer is currently over, or null. */
   dropTarget: number | null;
+  /**
+   * Whether the drop lands *after* the target row rather than before it.
+   *
+   * Lives here rather than in each caller because it restates the reordering
+   * rule the drop itself follows: a row dragged downwards settles after the row
+   * it was dropped on, and one dragged upwards settles before it. A caller
+   * drawing the insertion line from its own guess could disagree with where the
+   * page actually goes, which is worse than drawing no line at all.
+   */
+  dropAfter: boolean;
   /** Spread onto each row, with that row's index. */
   rowHandlers: (index: number) => ListDragHandlers;
 }
@@ -72,6 +82,7 @@ export function useListDrag<T extends HTMLElement>(options: ListDragOptions<T>):
   return {
     dragging,
     dropTarget,
+    dropAfter: dragging !== null && dropTarget !== null && dropTarget > dragging,
     rowHandlers: (index) => ({
       onPointerDown: (event) => {
         // Left button only, and never when the press lands on a control the row
@@ -95,7 +106,19 @@ export function useListDrag<T extends HTMLElement>(options: ListDragOptions<T>):
         }
         if (dragging === null) {
           setDragging(from.index);
-          event.currentTarget.setPointerCapture(event.pointerId);
+          // Capture keeps the move and up events coming even once the pointer
+          // has left the row, which it does immediately — that is the whole
+          // point of a drag. It is an improvement rather than a requirement
+          // though, and it throws in two situations that must not take the drag
+          // down with them: a runtime without it (jsdom, where this threw and
+          // silently ended every dragging test half way through), and a browser
+          // that considers the pointer no longer active.
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Without capture the drag still works while the pointer stays
+            // inside the list, which is where it spends a reorder anyway.
+          }
         }
         setDropTarget(rowUnder(event.clientX, event.clientY));
       },

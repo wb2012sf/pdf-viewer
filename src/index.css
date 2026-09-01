@@ -279,9 +279,35 @@ body {
   opacity: 0.4;
 }
 
-/* Where the dragged page would land. */
-.pages__item--drop {
-  border-color: var(--workbench-accent);
+/*
+ * Where the dragged page would land: a line on the edge it will be inserted at.
+ * Highlighting the row under the pointer instead reads as "onto this page",
+ * which is the one thing a reorder never means — and it left no way to tell
+ * whether the page was going above or below until it had already been dropped.
+ */
+.pages__item--drop-before,
+.pages__item--drop-after {
+  position: relative;
+}
+
+.pages__item--drop-before::after,
+.pages__item--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--workbench-accent);
+  pointer-events: none;
+}
+
+.pages__item--drop-before::after {
+  top: -2px;
+}
+
+.pages__item--drop-after::after {
+  bottom: -2px;
 }
 
 .pages__label {
@@ -579,6 +605,14 @@ body {
 }
 
 /* Where the dragged document would land. */
-.merge__item--drop {
+/*
+ * The edge the row will be inserted at. A line pinned to the top whichever way
+ * the row was travelling pointed at the wrong gap half the time.
+ */
+.merge__item--drop-before {
   box-shadow: inset 0 2px 0 0 var(--workbench-accent);
+}
+
+.merge__item--drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--workbench-accent);
 }

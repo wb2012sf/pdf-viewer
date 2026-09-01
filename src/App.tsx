@@ -358,7 +358,10 @@ export function App(): React.JSX.Element {
     setMerging(true);
     try {
       const combined = await mergePdfs(mergeQueue.items.map((item) => item.bytes));
-      const named = mergeQueue.items[0]?.name ?? 'merged.pdf';
+      // Named for what it is rather than for whichever document happened to be
+      // first: offering "sample.pdf" for a document that is no longer sample.pdf
+      // invites saving over the original.
+      const named = 'merged.pdf';
       setMergeOpen(false);
       mergeQueue.clear();
       // Edited, not freshly opened: the result exists nowhere on disk yet.
@@ -370,8 +373,11 @@ export function App(): React.JSX.Element {
     }
   }, [mergeQueue, replaceDocument]);
 
-  /** Opens the merge dialog, seeded with the document already open. */
-  const openMergeDialog = useCallback(async () => {
+  /**
+   * Opens the merge dialog, seeded with the document already open and with any
+   * files the caller supplies — dropped ones, in practice.
+   */
+  const openMergeDialog = useCallback(async (alsoAdd?: readonly File[]) => {
     if (!registry || !document) {
       mergeQueue.open();
     } else {
@@ -384,6 +390,7 @@ export function App(): React.JSX.Element {
       }
     }
     setMergeOpen(true);
+    if (alsoAdd && alsoAdd.length > 0) await mergeQueue.addFiles(alsoAdd);
   }, [registry, document, mergeQueue]);
 
   const handleSave = useCallback(async (): Promise<SaveResult> => {
@@ -462,12 +469,21 @@ export function App(): React.JSX.Element {
   /** Opens dropped files, asking first if there is unsaved work to lose. */
   const handleDropped = useCallback(
     (files: File[]) => {
+      // Several files at once is an assembly job. Merging them behind the reader
+      // gives no chance to check or change the order, so the dialog opens with
+      // them queued instead. Nothing is discarded by opening a dialog — the open
+      // document is seeded into the queue — so there is nothing to warn about.
+      if (files.length > 1) {
+        void openMergeDialog(files);
+        return;
+      }
+
       // A drop is a deliberate act, so it is worth asking about unsaved work
       // rather than refusing it; the files are held until the answer comes.
       if (requestAction('open')) void handleOpen(files);
       else droppedWhilePending.current = files;
     },
-    [requestAction, handleOpen],
+    [requestAction, handleOpen, openMergeDialog],
   );
 
   // Kept current for the viewer's commands, which were registered once and hold

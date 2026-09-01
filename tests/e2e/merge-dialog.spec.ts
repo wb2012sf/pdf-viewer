@@ -181,3 +181,71 @@ test.describe('merge list drag reordering', () => {
     await expect(page.getByTestId('merge-item-1')).toContainText('sample.pdf');
   });
 });
+
+test.describe('dropping several files at once', () => {
+  test.slow();
+
+  /** Drops files onto the window the way a file manager does. */
+  async function dropFiles(page: Page, files: { name: string; path: string }[]): Promise<void> {
+    const payload = await Promise.all(
+      files.map(async (file) => ({
+        name: file.name,
+        buffer: (await readFile(file.path)).toString('base64'),
+      })),
+    );
+    await page.evaluate((dropped) => {
+      const transfer = new DataTransfer();
+      for (const item of dropped) {
+        const bytes = Uint8Array.from(atob(item.buffer), (char) => char.charCodeAt(0));
+        transfer.items.add(new File([bytes], item.name, { type: 'application/pdf' }));
+      }
+      const target = document.body;
+      for (const type of ['dragenter', 'dragover', 'drop']) {
+        target.dispatchEvent(
+          new DragEvent(type, { dataTransfer: transfer, bubbles: true, cancelable: true }),
+        );
+      }
+    }, payload);
+  }
+
+  test('offers the merge dialog rather than merging behind the reader', async ({ page }) => {
+    // Dropping several files is an assembly job. Combining them silently gives
+    // no chance to check or change the order, and the result is a document
+    // nobody asked to be built that way.
+    await page.goto('/');
+    await expect(page.getByTestId('empty-state')).toBeVisible();
+
+    await dropFiles(page, [
+      { name: 'sample.pdf', path: SAMPLE_PDF },
+      { name: 'five.pdf', path: FIVE_PDF },
+    ]);
+
+    await expect(page.getByTestId('merge-dialog')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('merge-total')).toHaveText('7 pages in 2 files', { timeout: 30_000 });
+    await expect(page.getByTestId('merge-item-0')).toContainText('sample.pdf');
+    await expect(page.getByTestId('merge-item-1')).toContainText('five.pdf');
+  });
+
+  test('a single dropped file still opens straight away', async ({ page }) => {
+    // The dialog is for assembling; one file is just an open.
+    await page.goto('/');
+    await dropFiles(page, [{ name: 'sample.pdf', path: SAMPLE_PDF }]);
+
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByTestId('merge-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
+  });
+
+  test('the merged result is not named after whichever file was first', async ({ page }) => {
+    // "sample.pdf" for a document that is no longer sample.pdf invites saving
+    // over the original.
+    await openMergeDialog(page);
+    await page.getByTestId('merge-dialog-input').setInputFiles([SAMPLE_PDF, FIVE_PDF]);
+    await expect(page.getByTestId('merge-total')).toHaveText('7 pages in 2 files', { timeout: 30_000 });
+
+    await page.getByTestId('merge-confirm').click();
+
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByTestId('open-filename')).toHaveText('merged.pdf');
+  });
+});

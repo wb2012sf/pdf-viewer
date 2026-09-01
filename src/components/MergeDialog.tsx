@@ -129,7 +129,9 @@ export function MergeDialog({
               className={[
                 'merge__item',
                 drag.dragging === index ? 'merge__item--dragging' : '',
-                drag.dropTarget === index && drag.dragging !== index ? 'merge__item--drop' : '',
+                drag.dropTarget === index && drag.dragging !== index
+                  ? `merge__item--drop-${drag.dropAfter ? 'after' : 'before'}`
+                  : '',
               ]
                 .filter(Boolean)
                 .join(' ')}

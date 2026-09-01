@@ -109,6 +109,15 @@ export function PagePanel({
   // Splitting before page 1 alone would just reproduce the document.
   const canSplit = [...selected].some((index) => index > 0);
 
+  // Reordering without dragging. Dragging is quicker for a long way and worse
+  // for one place, and it is the only way at all for anyone who cannot hold a
+  // button down while moving a pointer.
+  const block = useMemo(() => [...selected].sort((a, b) => a - b), [selected]);
+  const first = block[0] ?? 0;
+  const last = block[block.length - 1] ?? 0;
+  const canMoveUp = hasSelection && first > 0;
+  const canMoveDown = hasSelection && last < count - 1;
+
 
   return (
     <aside
@@ -167,6 +176,27 @@ export function PagePanel({
       </div>
 
       <div className="pages__actions">
+        <button
+          type="button"
+          onClick={() => onMove(block, first - 1)}
+          disabled={busy || !canMoveUp}
+          data-testid="pages-move-up"
+          title="Move the selected pages up one"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          onClick={() => onMove(block, last + 1)}
+          disabled={busy || !canMoveDown}
+          data-testid="pages-move-down"
+          title="Move the selected pages down one"
+        >
+          ↓
+        </button>
+      </div>
+
+      <div className="pages__actions">
         <button type="button" onClick={onExtract} disabled={busy || !hasSelection} data-testid="pages-extract">
           Extract…
         </button>
@@ -219,7 +249,9 @@ export function PagePanel({
                 selected.has(index) ? 'pages__item--selected' : '',
                 currentPage === index ? 'pages__item--current' : '',
                 drag.dragging === index ? 'pages__item--dragging' : '',
-                drag.dropTarget === index && drag.dragging !== index ? 'pages__item--drop' : '',
+                drag.dropTarget === index && drag.dragging !== index
+                  ? `pages__item--drop-${drag.dropAfter ? 'after' : 'before'}`
+                  : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -329,8 +361,15 @@ export function PagePanel({
         data-testid="pages-resizer"
         onPointerDown={(event) => {
           resizeFrom.current = { x: event.clientX, width };
-          event.currentTarget.setPointerCapture(event.pointerId);
+          // Before the capture, not after: capture is optional and can throw,
+          // and letting that skip preventDefault left the browser starting a
+          // text selection across the whole panel instead of a resize.
           event.preventDefault();
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          } catch {
+            // Dragging the handle still tracks the pointer without it.
+          }
         }}
         onPointerMove={(event) => {
           const start = resizeFrom.current;

@@ -22,6 +22,7 @@ wrong, or the reverse.
 | Text | Works — value reaches the saved file, survives page operations |
 | Checkbox | Works |
 | Dropdown | Works as a control; see the note on the arrow below |
+| Dropdown, editable (custom value) | **Not implemented** — cannot take a value outside the list |
 | Max length | Works — patched by this app, see below |
 | Multiline, explicit font size | Works |
 | Multiline, automatic font size | Works — patched by this app, see below |
@@ -147,6 +148,41 @@ What is ruled out: the `<select>` overlay is not it. Its computed opacity is `0`
 before a click, after a click and after blurring, so nothing about it becomes
 visible at any point.
 
+
+### An editable dropdown will not take a custom value
+
+A combo box carrying the `Edit` flag (`Ff` bit 19) lets the reader type a value
+that is not in the list; Acrobat allows this. The viewer renders every combo box
+as a plain `<select>`, which structurally cannot hold a value outside its
+options, so the custom value has nowhere to go.
+
+**Not yet worked around, but it is fixable rather than an upstream wall.**
+`@embedpdf/plugin-form` exposes `setFormValues(values: Record<string, string>)`,
+which writes any value into a field by name — so the shape of the fix is to
+detect the `Edit` flag with pdf-lib the way the max-length limits are read
+already, present those fields as an `<input>` with a `<datalist>` of the options
+rather than a `<select>`, and write the result back through `setFormValues`.
+
+That is a new control rather than an attribute patch, so unlike the two fixes
+above it needs a screenshot review before it can be called done.
+
+### Not a defect: the viewer has its own Thumbnails tab
+
+There are two page views, and they are different things:
+
+- **This app's Pages panel** (left, headed "Pages") — reorder by dragging or with
+  ↑/↓, tick pages with click, shift-click or ctrl-click, rotate and delete per
+  page or in bulk, extract, split, append, and drag the panel edge to resize.
+- **The viewer's own sidebar tab headed "Thumbnails"** — navigation only. No
+  drag, no selection, no rotation, and it never had any: it is EmbedPDF's own
+  component, registered in its UI schema next to Outline.
+
+Reports that thumbnails cannot be dragged, multi-selected or rotated have all
+turned out to be the viewer's tab rather than the Pages panel. The two cannot be
+told apart by looking, which is the actual problem; the viewer's tab is part of
+a `tabs` schema entry carrying no `categories`, so `disabledCategories` cannot
+remove it, and overriding `ui.schema` wholesale is the same trap that `commands`
+turned out to be.
 ## Reporting these upstream
 
 <https://github.com/embedpdf/embed-pdf-viewer/issues>. The fixture in

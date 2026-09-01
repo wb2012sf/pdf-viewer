@@ -292,3 +292,22 @@ One line per assumption made instead of interrupting a session, newest last.
   files, the export bridge and command overrides, the form-widget patches, the bundled cursive fonts — has only
   ever run in a browser. The browser and the webview have already differed twice (`<a download>`, and now
   drag-and-drop), so this is worth a run rather than an assumption.
+- 2026-09-01 — Dropping several files at once now opens the merge dialog with them queued, instead of
+  merging them behind the reader and opening the result. Combining silently gave no chance to check or
+  change the order, and produced a document nobody had asked to be built that way. A single dropped file
+  still opens directly — one file is an open, not an assembly job.
+- 2026-09-01 — A merged document is named `merged.pdf` rather than after whichever file happened to be
+  first in the queue. Offering "sample.pdf" in the Save-as dialog for a document that is no longer
+  sample.pdf invites saving over the original.
+- 2026-09-01 — The reorder drop indicator is now a line on the edge the page will be inserted at, and it
+  follows the drag direction: downwards settles after the target row, upwards before it. Previously the
+  target row was outlined, which reads as "onto this page" — the one thing a reorder never means — and
+  gave no way to tell which side of it the page would land on until after the drop.
+- 2026-09-01 — Re-added ↑/↓ buttons alongside drag reordering rather than treating drag as the only way.
+  Dragging is quicker over a long distance and worse for moving one place, and it is not available at all
+  to anyone who cannot hold a button down while moving a pointer.
+- 2026-09-01 — `setPointerCapture` is called inside a `try`, and after `preventDefault` rather than before
+  it. It is an improvement to a drag, not a requirement, but it threw in jsdom and can throw in a browser
+  that considers the pointer inactive — and the throw was ending the drag, and in the resize handle also
+  skipping the `preventDefault` that stops the browser selecting text instead. This was masked as 7
+  "unhandled errors" in an otherwise green unit run.

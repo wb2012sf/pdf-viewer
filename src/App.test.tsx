@@ -125,3 +125,49 @@ describe('App save errors', () => {
     await waitFor(() => expect(screen.queryByTestId('save-error')).toBeNull());
   });
 });
+
+describe('dropping several files at once', () => {
+  /** A real PDF, so the merge queue can count its pages the way it does live. */
+  async function realPdf(name: string, pages: number): Promise<File> {
+    const { PDFDocument } = await import('pdf-lib');
+    const doc = await PDFDocument.create();
+    for (let page = 0; page < pages; page += 1) doc.addPage([200, 200]);
+    // Copied into a plain Uint8Array: pdf-lib types its output over
+    // ArrayBufferLike, which includes SharedArrayBuffer and so is not a BlobPart.
+    const bytes = new Uint8Array(await doc.save());
+    return new File([bytes], name, { type: 'application/pdf' });
+  }
+
+  function drop(files: File[]): void {
+    fireEvent.drop(screen.getByTestId('dropzone'), {
+      dataTransfer: { types: ['Files'], files, dropEffect: '' },
+    });
+  }
+
+  it('offers the merge dialog instead of combining them behind the reader', async () => {
+    // Merging silently gives no chance to check or change the order, and the
+    // result is a document nobody asked to be built that way.
+    render(<App />);
+
+    drop([await realPdf('first.pdf', 2), await realPdf('second.pdf', 3)]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('merge-dialog')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('merge-total').textContent).toBe('5 pages in 2 files');
+    });
+  });
+
+  it('opens a single dropped file straight away', async () => {
+    // One file is an open, not an assembly job.
+    render(<App />);
+
+    drop([await realPdf('only.pdf', 1)]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('open-filename').textContent).toBe('only.pdf');
+    });
+    expect(screen.queryByTestId('merge-dialog')).toBeNull();
+  });
+});
