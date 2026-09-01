@@ -177,6 +177,9 @@ body {
 }
 
 .pages {
+  --thumb-height: 5.5rem;
+  --thumb-max-width: 8rem;
+
   display: flex;
   flex-direction: column;
   flex: 0 0 15.5rem;
@@ -291,25 +294,29 @@ body {
   cursor: grabbing;
 }
 
+/* Sized by height, not width, so a landscape page comes out wider than a
+   portrait one instead of being squeezed to the same column. */
 .pages__thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 5rem;
+  height: var(--thumb-height);
   flex: 0 0 auto;
 }
 
 .pages__thumb img {
-  max-width: 100%;
-  max-height: 6.5rem;
+  height: 100%;
+  width: auto;
+  max-width: var(--thumb-max-width);
+  object-fit: contain;
   border: 1px solid var(--workbench-border);
   background: #fff;
 }
 
 .pages__thumb-placeholder {
   display: block;
-  width: 3rem;
-  height: 4rem;
+  width: calc(var(--thumb-height) * 0.7);
+  height: var(--thumb-height);
   border: 1px dashed var(--workbench-border);
   border-radius: 0.125rem;
 }
@@ -388,4 +395,35 @@ body {
 .pages__page-actions button:focus-visible {
   outline: 2px solid var(--workbench-accent);
   outline-offset: 1px;
+}
+
+/* Wraps the whole shell so a file can be dropped anywhere in the window. */
+.dropzone {
+  position: relative;
+  height: 100%;
+}
+
+.dropzone--over::after {
+  content: '';
+  position: absolute;
+  inset: 0.5rem;
+  z-index: 90;
+  border: 2px dashed var(--workbench-accent);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--workbench-accent) 8%, transparent);
+  pointer-events: none;
+}
+
+.dropzone__hint {
+  position: absolute;
+  z-index: 91;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  background: var(--workbench-accent);
+  color: #fff;
+  font-size: 0.875rem;
+  pointer-events: none;
 }

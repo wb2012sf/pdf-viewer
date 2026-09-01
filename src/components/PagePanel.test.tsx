@@ -41,20 +41,26 @@ function renderPanel(overrides: Partial<PagePanelProps> = {}): PagePanelProps {
   return props;
 }
 
-/** Drags the page at `from` onto the page at `to`. */
+/**
+ * Drags the page at `from` onto the page at `to`, the way a mouse does it.
+ *
+ * Reordering uses pointer events rather than HTML5 drag-and-drop, so this drives
+ * the same events a real press-move-release produces.
+ */
 function dragPage(from: number, to: number): void {
   const source = screen.getByTestId(`page-item-${String(from)}`);
-  const target = screen.getByTestId(`page-item-${String(to)}`);
-  const dataTransfer = {
-    effectAllowed: '',
-    dropEffect: '',
-    setData: vi.fn(),
-    getData: vi.fn(() => String(from)),
-  };
 
-  fireEvent.dragStart(source, { dataTransfer });
-  fireEvent.dragOver(target, { dataTransfer });
-  fireEvent.drop(target, { dataTransfer });
+  // jsdom gives every element a zero-sized box, so the drop target is stubbed
+  // by placing each row in its own horizontal band.
+  const items = screen.getByTestId('pages-list').querySelectorAll('li');
+  items.forEach((item, index) => {
+    item.getBoundingClientRect = () =>
+      ({ top: index * 100, bottom: index * 100 + 99, left: 0, right: 200 }) as DOMRect;
+  });
+
+  fireEvent.pointerDown(source, { button: 0, clientX: 10, clientY: from * 100 + 10 });
+  fireEvent.pointerMove(source, { clientX: 10, clientY: to * 100 + 10 });
+  fireEvent.pointerUp(source, { clientX: 10, clientY: to * 100 + 10 });
 }
 
 function button(id: string): HTMLButtonElement {
@@ -184,10 +190,34 @@ describe('PagePanel drag to reorder', () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 
-  it('does not offer dragging while an operation runs', () => {
-    renderPanel({ busy: true });
+  it('does not start a drag while an operation runs', () => {
+    const { onMove } = renderPanel({ busy: true });
 
-    expect(screen.getByTestId('page-item-0').getAttribute('draggable')).toBe('false');
+    dragPage(0, 2);
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a click that barely moves as a drag', () => {
+    // Otherwise ticking a page would sometimes reorder the document.
+    const { onMove } = renderPanel();
+    const source = screen.getByTestId('page-item-0');
+
+    fireEvent.pointerDown(source, { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(source, { clientX: 12, clientY: 11 });
+    fireEvent.pointerUp(source, { clientX: 12, clientY: 11 });
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('ignores a press that starts on one of the page buttons', () => {
+    const { onMove } = renderPanel();
+
+    fireEvent.pointerDown(screen.getByTestId('page-0-rotate-right'), { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(screen.getByTestId('page-item-0'), { clientX: 10, clientY: 210 });
+    fireEvent.pointerUp(screen.getByTestId('page-item-0'), { clientX: 10, clientY: 210 });
+
+    expect(onMove).not.toHaveBeenCalled();
   });
 });
 

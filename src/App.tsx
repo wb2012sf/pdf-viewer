@@ -3,6 +3,7 @@ import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 import type { PluginRegistry } from '@embedpdf/core';
 import { OpenPdfButton, type OpenPdfHandle } from './components/OpenPdfButton';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { DropZone } from './components/DropZone';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { useOcr } from './hooks/useOcr';
@@ -76,6 +77,8 @@ export function App(): React.JSX.Element {
   // plenty of scanners write that — and badging it "90°" tells the reader their
   // page is sideways when it plainly is not.
   const openedRotations = useRef<readonly number[]>([]);
+  /** Files dropped while a warning was up, opened once it is answered. */
+  const droppedWhilePending = useRef<File[] | null>(null);
 
   const engine = registry?.getEngine() ?? null;
 
@@ -184,12 +187,25 @@ export function App(): React.JSX.Element {
   const { reset: resetOcr, run: runOcr } = ocr;
 
   const handleOpen = useCallback(
-    async (file: File) => {
+    async (files: readonly File[]) => {
+      const [first, ...rest] = files;
+      if (!first) return;
+
       resetOcr();
-      replaceDocument(openDocumentFrom(file.name, new Uint8Array(await file.arrayBuffer())), false);
+      let bytes: Uint8Array = new Uint8Array(await first.arrayBuffer());
+
+      // Several files at once means one document: the first, with the others
+      // appended. Opening only the first and discarding the rest silently would
+      // be the worse answer.
+      if (rest.length > 0) {
+        const appended = await Promise.all(rest.map(async (file) => new Uint8Array(await file.arrayBuffer())));
+        bytes = await mergePdfs([bytes, ...appended]);
+      }
+      replaceDocument(openDocumentFrom(first.name, bytes), rest.length > 0);
     },
     [replaceDocument, resetOcr],
   );
+
 
   const handleRunOcr = useCallback(async () => {
     if (!registry || !engine || !document) return;
@@ -264,9 +280,11 @@ export function App(): React.JSX.Element {
   }, [registry, document, applyPageOp, selectedPages]);
 
   const handleMerge = useCallback(
-    async (file: File) => {
-      const appended = new Uint8Array(await file.arrayBuffer());
-      await runPageOp((bytes) => mergePdfs([bytes, appended]));
+    async (files: readonly File[]) => {
+      // Appended in the order they were chosen, which is the only order the
+      // user has expressed anything about.
+      const appended = await Promise.all(files.map(async (file) => new Uint8Array(await file.arrayBuffer())));
+      await runPageOp((bytes) => mergePdfs([bytes, ...appended]));
     },
     [runPageOp],
   );
@@ -373,10 +391,19 @@ export function App(): React.JSX.Element {
   const completePending = useCallback(
     (action: PendingAction) => {
       setPending(null);
-      if (action === 'close') closeDocument();
+      if (action === 'close') {
+        closeDocument();
+        return;
+      }
+
+      const dropped = droppedWhilePending.current;
+      droppedWhilePending.current = null;
+      // A drop that was interrupted by the warning resumes with those files
+      // rather than making the user find them again in a picker.
+      if (dropped) void handleOpen(dropped);
       else openPdfRef.current?.openPicker();
     },
-    [closeDocument],
+    [closeDocument, handleOpen],
   );
 
   const requestAction = useCallback(
@@ -386,6 +413,17 @@ export function App(): React.JSX.Element {
       return false;
     },
     [document, hasUnsavedChanges],
+  );
+
+  /** Opens dropped files, asking first if there is unsaved work to lose. */
+  const handleDropped = useCallback(
+    (files: File[]) => {
+      // A drop is a deliberate act, so it is worth asking about unsaved work
+      // rather than refusing it; the files are held until the answer comes.
+      if (requestAction('open')) void handleOpen(files);
+      else droppedWhilePending.current = files;
+    },
+    [requestAction, handleOpen],
   );
 
   // Kept current for the viewer's commands, which were registered once and hold
@@ -402,6 +440,7 @@ export function App(): React.JSX.Element {
   }, [requestAction, closeDocument]);
 
   return (
+    <DropZone onFiles={handleDropped} onReject={(message) => setSaveError(message)}>
     <div className="workbench">
       <header className="workbench__bar">
         <span className="workbench__title">PDF Workbench</span>
@@ -462,7 +501,7 @@ export function App(): React.JSX.Element {
 
         <OpenPdfButton
           ref={openPdfRef}
-          onOpen={(file) => void handleOpen(file)}
+          onOpen={(file) => void handleOpen([file])}
           beforeOpen={() => requestAction('open')}
         />
       </header>
@@ -477,7 +516,10 @@ export function App(): React.JSX.Element {
           }
           confirmLabel={pending === 'close' ? 'Close without saving' : 'Discard and open'}
           saveLabel="Save as…"
-          onCancel={() => setPending(null)}
+          onCancel={() => {
+            droppedWhilePending.current = null;
+            setPending(null);
+          }}
           onConfirm={() => completePending(pending)}
           onSave={() => {
             // Only carry on once something was actually written: a dismissed
@@ -496,12 +538,13 @@ export function App(): React.JSX.Element {
         ref={mergeInputRef}
         type="file"
         accept="application/pdf,.pdf"
+        multiple
         className="workbench__file-input"
         data-testid="merge-input"
         onChange={(event) => {
-          const file = event.target.files?.[0];
+          const files = [...(event.target.files ?? [])];
           event.target.value = '';
-          if (file) void handleMerge(file);
+          if (files.length > 0) void handleMerge(files);
         }}
       />
 
@@ -548,5 +591,6 @@ export function App(): React.JSX.Element {
         )}
       </main>
     </div>
+    </DropZone>
   );
 }

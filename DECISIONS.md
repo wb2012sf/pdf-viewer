@@ -227,6 +227,23 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-08-31 — The tick boxes must not `preventDefault` on click: doing so left a row highlighted and counted as
   selected while its box rendered unticked. Caught in a screenshot review, and now asserted.
 
+- 2026-09-01 — **Two bugs the user reported, both mine, both with tests that had been passing.** The previews
+  blanked on every page operation because replacing the document nulls the registry, so the engine went null
+  and `useThumbnails` cleared — the test only polled for "not empty" afterwards, which is satisfied once the
+  *new* previews land and says nothing about the gap. It now watches the list continuously and asserts it never
+  emptied.
+- 2026-09-01 — Reordering moved from HTML5 drag-and-drop to pointer events. Native drag would not start from
+  the preview image, and cannot be driven by real mouse movement in a test — so `locator.dragTo`, which
+  dispatches the drag events directly, passed while nobody could actually drag a page. The e2e helper now
+  presses, moves in steps and releases on the image itself, which is what a hand does.
+- 2026-09-01 — Thumbnails are sized by height rather than width, so a landscape page comes out wider than a
+  portrait one instead of being squeezed into the same column.
+- 2026-09-01 — Appending accepts several files at once, in the order chosen. Dropping several onto the window
+  opens the first with the rest appended: opening only the first and discarding the others silently would be
+  the worse answer.
+- 2026-09-01 — A drop is treated as deliberate, so it asks about unsaved work rather than refusing; the files
+  are held across the warning and opened once it is answered, rather than making the user find them again.
+
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.

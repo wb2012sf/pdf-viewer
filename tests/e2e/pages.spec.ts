@@ -57,9 +57,29 @@ async function thumbnailsSettle(page: Page): Promise<void> {
   await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
 }
 
-/** Drags the page at `from` onto the page at `to`, the way a person reorders. */
+/**
+ * Drags the page at `from` onto the page at `to` with a real mouse.
+ *
+ * Deliberately not `locator.dragTo`: that dispatches HTML5 drag events straight
+ * at the page, so it passed while a person moving the mouse could not reorder
+ * anything at all. Press, move in steps, release — the same events a hand makes.
+ */
 async function dragPage(page: Page, from: number, to: number): Promise<void> {
-  await page.getByTestId(`page-item-${String(from)}`).dragTo(page.getByTestId(`page-item-${String(to)}`));
+  // Grab the preview image, which is what a person actually takes hold of.
+  const source = (await page.getByTestId(`page-item-${String(from)}`).locator('img').boundingBox())!;
+  const target = (await page.getByTestId(`page-item-${String(to)}`).boundingBox())!;
+
+  const startX = source.x + source.width / 2;
+  const startY = source.y + source.height / 2;
+  const endX = target.x + target.width / 2;
+  const endY = target.y + target.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  for (let step = 1; step <= 6; step += 1) {
+    await page.mouse.move(startX + ((endX - startX) * step) / 6, startY + ((endY - startY) * step) / 6);
+  }
+  await page.mouse.up();
 }
 
 test.describe('page operations', () => {
@@ -85,17 +105,28 @@ test.describe('page operations', () => {
     await openSample(page);
     await thumbnailsSettle(page);
 
+    // Watch the list continuously rather than sampling it afterwards: polling
+    // for "not empty" is satisfied the moment the *new* previews land, and says
+    // nothing about whether the panel blanked in between. It did.
+    await page.evaluate(() => {
+      const list = document.querySelector('[data-testid="pages-list"]')!;
+      const seen = { emptied: false };
+      (window as unknown as { previewWatch: typeof seen }).previewWatch = seen;
+      new MutationObserver(() => {
+        if (list.querySelectorAll('img').length === 0) seen.emptied = true;
+      }).observe(list, { childList: true, subtree: true });
+    });
+
     await page.getByTestId('page-0').check();
     await page.getByTestId('pages-rotate-right').click();
 
-    // Never empty, at any point: stale previews stay up until new ones land.
-    await expect
-      .poll(() => page.getByTestId('pages-list').locator('img').count(), { timeout: 60_000 })
-      .toBeGreaterThan(0);
     await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
     await thumbnailsSettle(page);
 
     await expect(page.getByTestId('pages-list').locator('img')).toHaveCount(2);
+    expect(
+      await page.evaluate(() => (window as unknown as { previewWatch: { emptied: boolean } }).previewWatch.emptied),
+    ).toBe(false);
   });
 
   test('rotates a page, and the rotation survives saving', async ({ page }) => {

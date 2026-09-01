@@ -34,6 +34,12 @@ export function useThumbnails(engine: PdfEngine | null, pdfBytes: Uint8Array | n
   const showing = useRef<readonly Thumbnail[]>([]);
 
   useEffect(() => {
+    // The engine goes away for a moment every time the document is replaced —
+    // the viewer is remounted and hands back a new one. That is not a reason to
+    // throw the previews away: only the document actually closing is. Without
+    // this the panel blanks on every single page operation.
+    if (!engine && pdfBytes) return;
+
     const controller = new AbortController();
     const rendering =
       engine && pdfBytes
