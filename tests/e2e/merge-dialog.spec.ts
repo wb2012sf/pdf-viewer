@@ -199,7 +199,10 @@ test.describe('dropping several files at once', () => {
         const bytes = Uint8Array.from(atob(item.buffer), (char) => char.charCodeAt(0));
         transfer.items.add(new File([bytes], item.name, { type: 'application/pdf' }));
       }
-      const target = document.body;
+      // React listens at its own root, so a drop dispatched on an ancestor of
+      // the dropzone never reaches it. A file manager targets what is under the
+      // pointer; here that is the dropzone itself.
+      const target = document.querySelector('[data-testid="dropzone"]') ?? document.body;
       for (const type of ['dragenter', 'dragover', 'drop']) {
         target.dispatchEvent(
           new DragEvent(type, { dataTransfer: transfer, bubbles: true, cancelable: true }),
