@@ -32,8 +32,15 @@ wrong, or the reverse.
 ### Max length is not enforced — patched here
 
 A field with `MaxLen 4` produces an `<input>` with no `maxlength` attribute, so
-a longer value could be typed and saved. Nothing in the PDF stops it either —
-the limit only ever exists in the viewer.
+a longer value can be typed and is displayed in full.
+
+It is not, however, *saved* in full: measured on 2026-09-03 with the workaround
+disabled, typing `123456789` leaves the widget showing all nine characters while
+the exported document contains `"1234"`. The truncation is correct — the value
+must not exceed `MaxLen` — but it happens silently at save time rather than at
+the keystroke, so the five discarded characters are invisible until the file is
+reopened. (An earlier version of this note claimed the long value reached the
+saved file. It does not.)
 
 **Worked around** in `src/lib/viewer/form-field-fixes.ts`: the limits are read
 from the document with pdf-lib and applied to the widgets, and a value that is
@@ -185,6 +192,8 @@ remove it, and overriding `ui.schema` wholesale is the same trap that `commands`
 turned out to be.
 ## Reporting these upstream
 
+Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste
+issues with the measurements behind each. File them at
 <https://github.com/embedpdf/embed-pdf-viewer/issues>. The fixture in
 `tests/e2e/fixtures/` reproduces all of them in one document, and
 `node tests/e2e/fixtures/make-fixture-pdf.mjs` regenerates it.
