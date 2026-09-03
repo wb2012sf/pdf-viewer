@@ -1,8 +1,15 @@
 # Upstream issue drafts — EmbedPDF
 
-Drafts for <https://github.com/embedpdf/embed-pdf-viewer/issues>, one section per
-issue, ready to paste. Written 2026-09-03 against **2.15.0** (exact, not a
-resolved range).
+Drafts for <https://github.com/embedpdf/embed-pdf-viewer/issues>, seven of them,
+one section per issue, ready to paste. Written 2026-09-03 against **2.15.0**
+(exact, not a resolved range).
+
+Two known defects are deliberately **not** here. File-select fields offering no
+picker is a security position other viewers take too, not a defect worth a
+maintainer's attention. The combo-box dropdown arrow cannot be reproduced
+without a PDF from a real form authoring tool, and its likely cause is already
+switched on here — a report nobody can confirm costs more than it is worth. Both
+stay recorded in `KNOWN-ISSUES.md`.
 
 Everything below was measured on the day it was written, with this app's own
 workarounds disabled, so the numbers describe the viewer's behaviour rather than
@@ -11,10 +18,10 @@ about it.
 
 **Before filing:** check whether a newer release fixes any of these, and search
 the tracker for duplicates. Attach `tests/e2e/fixtures/form-types.pdf` (5.5 KB)
-to issues 1–5 — it carries every field type below in one document, and
+to issues 1–4 — it carries every field type below in one document, and
 `node tests/e2e/fixtures/make-fixture-pdf.mjs` regenerates it.
 
-**Shared environment block** for issues 1–5:
+**Shared environment block** for issues 1–4:
 
 > - `@embedpdf/react-pdf-viewer` 2.15.0 (`@embedpdf/core`, `@embedpdf/pdfium` also 2.15.0)
 > - Chromium 142 via Playwright 1.62.1, headless, Linux
@@ -155,8 +162,6 @@ which writes any value into a field by name — so the missing piece looks like 
 control rather than the plumbing. An `<input>` paired with a `<datalist>` of the
 options would preserve the list while allowing a value outside it.
 
-Happy to open a PR if that shape is agreeable.
-
 ---
 
 ## 4. A push button is drawn into the page but has no interactive control
@@ -187,7 +192,8 @@ and is not is worse than one that is not drawn at all.
 
 ### Note
 
-Form *submission* being unimplemented is entirely reasonable — see issue 5. But
+Form *submission* being unimplemented is entirely reasonable — it is a route for
+a document to reach the network, and several viewers deliberately skip it. But
 push buttons also carry non-network actions (JavaScript, named actions, reset),
 and a host application cannot implement any of them without an element to bind
 to.
@@ -200,40 +206,7 @@ buttons were invisible *and* inert, which reads as a rendering fault rather than
 a configuration one. Worth calling out in the rendering docs, if it isn't
 already.
 
----
-
-## 5. A `FileSelect` field renders as a plain text input, with no way to choose a file
-
-**Type:** feature request / documentation
-
-### What happens
-
-A text field carrying the `FileSelect` flag renders as `<input type="text">`.
-There is no file picker, so the field cannot be filled as intended.
-
-### Steps to reproduce
-
-1. Open the attached `form-types.pdf`.
-2. Inspect the widget named `field.attachment`.
-
-### Actual
-
-`tagName === "INPUT"`, `type === "text"`.
-
-### Note
-
-This is filed as a feature request rather than a defect because declining to
-implement file-select is a defensible security position — it is a route for a
-document to reach into the filesystem, and several viewers deliberately skip it.
-
-The ask is therefore modest: **state the position in the docs**, and ideally
-expose the flag to host applications so they can decide for themselves. Right
-now the field is indistinguishable from an ordinary text field at the DOM level,
-so a host cannot even render its own picker.
-
----
-
-## 6. The Export command uses `<a download>`, which silently does nothing in a non-browser webview
+## 5. The Export command uses `<a download>`, which silently does nothing in a non-browser webview
 
 **Type:** bug
 
@@ -279,7 +252,7 @@ is there; nothing says it is the thing to use.
 
 ---
 
-## 7. No way to intercept `document:open` / `document:close` before they act
+## 6. No way to intercept `document:open` / `document:close` before they act
 
 **Type:** feature request
 
@@ -322,7 +295,7 @@ path — it works well, it just isn't written down anywhere as the answer.
 
 ---
 
-## 8. `disabledCategories` cannot remove the Thumbnails tab or the Export menu item
+## 7. `disabledCategories` cannot remove the Thumbnails tab or the Export menu item
 
 **Type:** bug / feature request
 
@@ -345,7 +318,7 @@ multi-selected", "can't be rotated" — every one of which turned out to be the
 viewer's own navigation-only tab rather than the host's panel. The reports were
 reasonable; the two views look alike and do different things.
 
-Overriding `ui.schema` wholesale is the same trap as issue 7's `commands`: it
+Overriding `ui.schema` wholesale is the same trap as issue 6's `commands`: it
 replaces rather than merges.
 
 ### Ask
@@ -353,16 +326,3 @@ replaces rather than merges.
 Either give every schema entry a category, or provide a supported way to hide
 individual entries by id.
 
----
-
-## Not filing yet
-
-**The combo-box dropdown arrow** — reported as appearing only after clicking
-into the field, where Acrobat shows it from the start. The likely cause is the
-`render.withForms` default described in issue 4, which is now switched on here.
-Our fixture cannot confirm it either way, because pdf-lib's generated combo-box
-appearance stream has no arrow to draw in the first place. This needs a document
-authored by a real form tool before it is worth anyone's time upstream.
-
-What is ruled out: the `<select>` overlay is not the cause. Its computed opacity
-is `0` before a click, after a click, and after blurring.

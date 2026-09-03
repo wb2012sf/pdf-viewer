@@ -192,8 +192,18 @@ remove it, and overriding `ui.schema` wholesale is the same trap that `commands`
 turned out to be.
 ## Reporting these upstream
 
-Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste
-issues with the measurements behind each. File them at
+Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for seven ready-to-paste issues
+with the measurements behind each. File them at
 <https://github.com/embedpdf/embed-pdf-viewer/issues>. The fixture in
 `tests/e2e/fixtures/` reproduces all of them in one document, and
 `node tests/e2e/fixtures/make-fixture-pdf.mjs` regenerates it.
+
+Two of the defects above are deliberately not being reported, and stay here as a
+record rather than a to-do:
+
+- **File-select fields offer no picker.** Declining to implement file-select is a
+  defensible security position that several viewers take, so this is a
+  limitation rather than a defect.
+- **The dropdown arrow.** It cannot be reproduced without a document authored by
+  a real form tool, and its likely cause — `render.withForms` defaulting to
+  false — is already switched on here, so it may not survive a re-test anyway.
