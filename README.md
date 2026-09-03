@@ -27,7 +27,24 @@ npm run dev          # http://localhost:5173
 | `npm run lint`         | ESLint                                                     |
 | `npm run typecheck`    | `tsc --noEmit`                                             |
 
-`npm run test:e2e` needs the browser binary once: `npx playwright install --with-deps chromium`.
+`npm run test:e2e` needs two things once per machine — the browser binary and the system libraries it
+links against:
+
+```bash
+npx playwright install chromium        # browser binary, as your normal user
+sudo npx playwright install-deps       # ~294 apt packages, needs root
+```
+
+No display server is required afterwards; headless Chromium only needs the libraries present.
+
+Two traps if you install the dependencies from a root shell rather than via `sudo`:
+
+- **Node is installed through nvm, under your own home directory**, so root has no `node` on its PATH and
+  `./node_modules/.bin/playwright` dies with `/usr/bin/env: 'node': No such file or directory`. Either
+  prefix the PATH (`PATH=$HOME/.nvm/versions/node/<version>/bin:$PATH`, using the owning user's home) or
+  hand apt the package list directly — `playwright install-deps --dry-run` prints it.
+- **Only `install-deps` should run as root.** `playwright install` as root downloads a second copy of the
+  browsers into `/root/.cache/ms-playwright`, leaving the copy the tests actually use untouched.
 
 ## Desktop app
 
@@ -84,8 +101,9 @@ beforehand survive. The viewer reopens on the result, and nothing is written to 
 Extract is the exception: it produces a new file alongside the original rather than replacing what is open.
 
 **Merge…** in the toolbar assembles several documents into one, in an order you set by dragging them (or with
-the ↑/↓ buttons), and works with nothing open at all — that is the case Append cannot serve. Drop PDFs anywhere in the window to open them; several at
-once opens the first with the rest appended.
+the ↑/↓ buttons), and works with nothing open at all — that is the case Append cannot serve. Drop PDFs
+anywhere in the window to open them: one file opens straight away, while several open the merge dialog with
+them queued, so the order can be checked before anything is assembled.
 
 ## OCR
 
