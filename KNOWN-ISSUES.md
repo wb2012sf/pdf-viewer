@@ -125,10 +125,15 @@ they run this app's handlers. That covers the shortcuts as well as the menu
 items — a warning that Ctrl+W walks past is not a warning.
 
 Two approaches that do *not* work, recorded so they are not tried again:
-supplying `commands` in the viewer config replaces the entire command set, after
-which the viewer fails to render at all because its UI refers to commands that
-no longer exist; and `onDocumentOpened`/`onDocumentClosed` only report
-afterwards, which is too late to ask the user anything.
+
+- **Supplying `commands` in the viewer config** replaces the entire command set
+  rather than merging into it, and the viewer's own UI then refers to commands
+  that no longer exist. Measured on 2026-09-03 with a one-command map: the
+  toolbar goes from 22 buttons to **0**, rendered pages from 4 to **0**, and the
+  page throws `Command not found: document:menu` — a command we never touched,
+  which is what makes the cause so hard to see from the symptom.
+- **`onDocumentOpened`/`onDocumentClosed`** only report afterwards, which is too
+  late to ask the user anything.
 
 ### Dropping files needs Tauri's own drag-drop turned off
 
@@ -192,7 +197,7 @@ remove it, and overriding `ui.schema` wholesale is the same trap that `commands`
 turned out to be.
 ## Reporting these upstream
 
-Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for seven ready-to-paste issues
+Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste issues
 with the measurements behind each. File them at
 <https://github.com/embedpdf/embed-pdf-viewer/issues>. The fixture in
 `tests/e2e/fixtures/` reproduces all of them in one document, and

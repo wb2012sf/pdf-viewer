@@ -1,6 +1,6 @@
 # Upstream issue drafts — EmbedPDF
 
-Drafts for <https://github.com/embedpdf/embed-pdf-viewer/issues>, seven of them,
+Drafts for <https://github.com/embedpdf/embed-pdf-viewer/issues>, eight of them,
 one section per issue, ready to paste. Written 2026-09-03 against **2.15.0**
 (exact, not a resolved range).
 
@@ -275,10 +275,8 @@ Recorded because two of the three obvious approaches fail, and the failures are
 not obvious:
 
 1. **Supplying `commands` in the viewer config** — replaces the *entire* command
-   set rather than merging. The viewer then fails to render at all, because its
-   UI refers to commands that no longer exist. **Arguably a bug in its own
-   right:** a partial `commands` map producing a blank viewer with no error is a
-   sharp edge, and this one may deserve a separate issue.
+   set rather than merging, which takes the whole UI down with it. Filed
+   separately as issue 7.
 2. **`onDocumentOpened` / `onDocumentClosed`** — these report after the fact,
    which is too late to ask the user anything.
 3. **Re-registering `document:open` and `document:close` through the commands
@@ -295,7 +293,82 @@ path — it works well, it just isn't written down anywhere as the answer.
 
 ---
 
-## 7. `disabledCategories` cannot remove the Thumbnails tab or the Export menu item
+## 7. A partial `commands` map in the viewer config replaces the whole command set and takes the UI down
+
+**Type:** bug
+
+### What happens
+
+`PDFViewerConfig.commands.commands` is typed `Record<string, Command>` and is
+**required** within `CommandsPluginConfig`. Supplying it to override a single
+command replaces the entire default command map rather than merging into it. The
+viewer's own UI still refers to the commands that are now gone, so the toolbar
+and the page area both fail to render.
+
+There is no way to express "override this one command" through the config, and
+nothing in the types signals that a partial map is not a partial override.
+
+### Steps to reproduce
+
+Configure the viewer with one command:
+
+```ts
+commands: {
+  commands: {
+    'document:close': {
+      id: 'document:close',
+      label: 'Close',
+      shortcuts: ['Ctrl+W'],
+      action: () => undefined,
+    },
+  },
+},
+```
+
+Then open any document.
+
+### Expected
+
+The supplied command overrides the default of the same id; every other command
+keeps working. Failing that, a startup error naming the actual problem.
+
+### Actual
+
+Measured on 2026-09-03, same document and viewer in both runs:
+
+| | Default config | With the one-command map |
+| --- | --- | --- |
+| Buttons in the viewer's shadow root | 22 | **0** |
+| Rendered page images | 4 | **0** |
+| Uncaught page errors | none | `Command not found: document:menu` |
+
+The custom element and its shadow root are still present, so nothing looks
+crashed from the outside — the viewer is simply empty, with no toolbar and no
+page.
+
+### Why it matters
+
+The error names `document:menu` — the first missing command the UI happens to
+reach for — which points at a command the host never touched. Nothing connects
+it to the `commands` key in the config, so it reads as an internal fault rather
+than a configuration mistake. We spent real time on this before concluding the
+config key was the cause.
+
+### Ask
+
+Merge the supplied map over the defaults, or reject a partial map at startup
+with an error that names the config key. Either would have turned this into a
+minute's work.
+
+### Note
+
+The workaround is to register commands at runtime through the commands plugin
+instead, which replaces a command in place and leaves the rest alone. That works
+well — see issue 6, which asks for it to be documented.
+
+---
+
+## 8. `disabledCategories` cannot remove the Thumbnails tab or the Export menu item
 
 **Type:** bug / feature request
 
@@ -318,7 +391,7 @@ multi-selected", "can't be rotated" — every one of which turned out to be the
 viewer's own navigation-only tab rather than the host's panel. The reports were
 reasonable; the two views look alike and do different things.
 
-Overriding `ui.schema` wholesale is the same trap as issue 6's `commands`: it
+Overriding `ui.schema` wholesale is the same trap as issue 7's `commands`: it
 replaces rather than merges.
 
 ### Ask
