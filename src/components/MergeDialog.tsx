@@ -59,6 +59,33 @@ export function MergeDialog({
     addRef.current?.focus();
   }, []);
 
+  /** The document an arrow was last pressed for, so focus can follow it. */
+  const moved = useRef<{ id: string; direction: -1 | 1 } | null>(null);
+
+  // Rows are keyed by document id, so React moves the row rather than rebuilding
+  // it and focus travels with the button on its own. It only comes adrift at the
+  // ends: the arrow that was doing the moving is disabled once the document
+  // arrives, and a disabled button cannot hold focus, so the keyboard would drop
+  // to the page just as someone repeating the key reaches their destination.
+  useEffect(() => {
+    const last = moved.current;
+    if (!last) return;
+    moved.current = null;
+
+    const index = items.findIndex((item) => item.id === last.id);
+    if (index < 0) return;
+
+    const arrow = (direction: -1 | 1): HTMLButtonElement | null =>
+      listRef.current?.querySelector<HTMLButtonElement>(
+        `[data-testid="merge-${direction === -1 ? 'up' : 'down'}-${String(index)}"]`,
+      ) ?? null;
+
+    const pressed = arrow(last.direction);
+    // The opposite arrow is on the same row, so the keyboard stays on the same
+    // document rather than on whatever now occupies the position it left.
+    (pressed && !pressed.disabled ? pressed : arrow(last.direction === -1 ? 1 : -1))?.focus();
+  }, [items]);
+
   const totalPages = items.reduce((sum, item) => sum + (item.pages ?? 0), 0);
   const canMerge = items.length >= 2 && !busy;
 
@@ -148,7 +175,10 @@ export function MergeDialog({
               </span>
               <button
                 type="button"
-                onClick={() => onMove(item.id, -1)}
+                onClick={() => {
+                  moved.current = { id: item.id, direction: -1 };
+                  onMove(item.id, -1);
+                }}
                 disabled={busy || index === 0}
                 aria-label={`Move ${item.name} earlier`}
                 data-testid={`merge-up-${String(index)}`}
@@ -157,7 +187,10 @@ export function MergeDialog({
               </button>
               <button
                 type="button"
-                onClick={() => onMove(item.id, 1)}
+                onClick={() => {
+                  moved.current = { id: item.id, direction: 1 };
+                  onMove(item.id, 1);
+                }}
                 disabled={busy || index === items.length - 1}
                 aria-label={`Move ${item.name} later`}
                 data-testid={`merge-down-${String(index)}`}

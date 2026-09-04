@@ -252,3 +252,52 @@ test.describe('dropping several files at once', () => {
     await expect(page.getByTestId('open-filename')).toHaveText('merged.pdf');
   });
 });
+
+test.describe('the arrows follow the document, not the position', () => {
+  test.slow();
+
+  const FORM_PDF = fileURLToPath(new URL('./fixtures/form.pdf', import.meta.url));
+  const SCANNED_PDF = fileURLToPath(new URL('./fixtures/scanned.pdf', import.meta.url));
+
+  async function queueFour(page: Page): Promise<void> {
+    await openMergeDialog(page);
+    await page.getByTestId('merge-dialog-input').setInputFiles([SAMPLE_PDF, FIVE_PDF, FORM_PDF, SCANNED_PDF]);
+    await expect(page.getByTestId('merge-item-3')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('merge-item-0')).toContainText('sample.pdf');
+  }
+
+  test('keeps the keyboard on the document that moved', async ({ page }) => {
+    // The row moves out from under the pointer, so the button that was just
+    // pressed now belongs to a different document. Focus has to travel with the
+    // document, or the next press acts on whatever took its place.
+    await queueFour(page);
+
+    await page.getByTestId('merge-down-0').click();
+
+    await expect(page.getByTestId('merge-item-1')).toContainText('sample.pdf');
+    await expect(page.locator(':focus')).toHaveAttribute('aria-label', 'Move sample.pdf later');
+  });
+
+  test('pressing again moves the same document rather than its replacement', async ({ page }) => {
+    await queueFour(page);
+
+    await page.getByTestId('merge-down-0').click();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByTestId('merge-item-3')).toContainText('sample.pdf');
+  });
+
+  test('reaching the end keeps the keyboard on the document rather than dropping it', async ({ page }) => {
+    // The button just pressed is disabled once the document is last, so focus
+    // would otherwise fall back to the page and the next key go nowhere.
+    await queueFour(page);
+
+    await page.getByTestId('merge-down-0').click();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByTestId('merge-item-3')).toContainText('sample.pdf');
+    await expect(page.locator(':focus')).toHaveAttribute('aria-label', 'Move sample.pdf earlier');
+  });
+});
