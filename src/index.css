@@ -179,7 +179,6 @@ body {
 .pages {
   /* Overridden inline as the panel is resized; these are the fallbacks. */
   --thumb-height: 5.5rem;
-  --thumb-max-width: 8rem;
 
   position: relative;
   display: flex;
@@ -322,23 +321,43 @@ body {
   cursor: grabbing;
 }
 
-/* Sized by height, not width, so a landscape page comes out wider than a
-   portrait one instead of being squeezed to the same column. */
+/* Every preview fits inside the same square box, so turning a page changes
+   which way it faces and nothing else.
+
+   Sizing by height alone (what this used to do) made a rotated page grow: a
+   landscape page drawn at the portrait height is wider than the portrait page
+   was tall, so it came out larger in both dimensions and then hit a max-width
+   that squashed it. A square box maps the page's long edge to the same length
+   whichever way round it is, which is what "the same page, turned" should look
+   like. It also keeps every preview in one column — a wide row would otherwise
+   shove its neighbours out of line. */
 .pages__thumb {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: var(--thumb-height);
   height: var(--thumb-height);
   flex: 0 0 auto;
 }
 
 .pages__thumb img {
-  height: 100%;
-  width: auto;
-  max-width: var(--thumb-max-width);
   object-fit: contain;
   border: 1px solid var(--workbench-border);
   background: #fff;
+}
+
+/* The long edge fills the box; the short one follows from the page's own
+   proportions. Previews are rendered small and scaled up to whatever the panel
+   is currently set to, so this has to size the picture rather than merely cap
+   it — capping alone stopped the previews growing when the panel was widened. */
+.pages__thumb-tall {
+  height: 100%;
+  width: auto;
+}
+
+.pages__thumb-wide {
+  width: 100%;
+  height: auto;
 }
 
 .pages__thumb-placeholder {

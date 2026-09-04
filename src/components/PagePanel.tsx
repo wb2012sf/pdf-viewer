@@ -127,7 +127,6 @@ export function PagePanel({
       style={{
         flexBasis: `${String(width)}px`,
         ['--thumb-height' as string]: `${String(thumbHeightFor(width))}px`,
-        ['--thumb-max-width' as string]: `${String(Math.round(width * 0.62))}px`,
       }}
     >
       <header className="pages__head">
@@ -276,7 +275,17 @@ export function PagePanel({
                 }}
               >
                 {thumb ? (
-                  <img src={thumb.url} alt={`Page ${String(index + 1)}`} draggable={false} />
+                  <img
+                    src={thumb.url}
+                    alt={`Page ${String(index + 1)}`}
+                    draggable={false}
+                    // Which edge fills the square box, so a page keeps its
+                    // scale when it is turned. Driven by the rendered preview's
+                    // own dimensions, which already have the page's rotation
+                    // applied — CSS alone cannot both fill the box and leave the
+                    // element the size of the picture inside it.
+                    className={thumb.width >= thumb.height ? 'pages__thumb-wide' : 'pages__thumb-tall'}
+                  />
                 ) : (
                   <span className="pages__thumb-placeholder" aria-hidden="true" />
                 )}

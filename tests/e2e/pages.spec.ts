@@ -419,3 +419,58 @@ test.describe('panel sizing and page sync', () => {
     await expect(page.getByTestId('page-panel')).not.toContainText('selected');
   });
 });
+
+test.describe('a rotated preview keeps its size and its column', () => {
+  test.slow();
+
+  const FIVE_PAGES = fileURLToPath(new URL('./fixtures/five.pdf', import.meta.url));
+
+  async function openFive(page: Page): Promise<void> {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(FIVE_PAGES);
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await page.getByTestId('toggle-pages').click();
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+  }
+
+  test('turning a page sideways swaps its preview, and does not enlarge it', async ({ page }) => {
+    // Rotating changes which way a page faces. It must not change how big the
+    // page looks: sizing previews by height alone made a rotated page grow in
+    // both dimensions, because a landscape page drawn at portrait height is
+    // wider than the portrait page it came from was tall.
+    await openFive(page);
+
+    const before = (await page.getByTestId('page-item-0').locator('img').boundingBox())!;
+    expect(before.height).toBeGreaterThan(before.width);
+
+    await page.getByTestId('page-0').click();
+    await page.getByTestId('pages-rotate-right').click();
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+
+    const after = (await page.getByTestId('page-item-0').locator('img').boundingBox())!;
+
+    // Now landscape.
+    expect(after.width).toBeGreaterThan(after.height);
+    // And the same page at the same scale: the long edge is still the long edge.
+    expect(after.width).toBeCloseTo(before.height, 0);
+    expect(after.height).toBeCloseTo(before.width, 0);
+  });
+
+  test('a sideways preview stays in the same column as the upright ones', async ({ page }) => {
+    // A preview that is wider than its neighbours must not push its row out of
+    // line; every page sits in one column, centred, however it is turned.
+    await openFive(page);
+
+    await page.getByTestId('page-0').click();
+    await page.getByTestId('pages-rotate-right').click();
+    await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°', { timeout: 60_000 });
+    await expect(page.getByTestId('pages-list')).toHaveAttribute('data-stale', 'false', { timeout: 90_000 });
+
+    const rotated = (await page.getByTestId('page-item-0').locator('img').boundingBox())!;
+    const upright = (await page.getByTestId('page-item-1').locator('img').boundingBox())!;
+
+    const centreOf = (box: { x: number; width: number }) => box.x + box.width / 2;
+    expect(centreOf(rotated)).toBeCloseTo(centreOf(upright), 0);
+  });
+});
