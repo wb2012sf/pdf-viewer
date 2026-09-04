@@ -311,3 +311,10 @@ One line per assumption made instead of interrupting a session, newest last.
   that considers the pointer inactive — and the throw was ending the drag, and in the resize handle also
   skipping the `preventDefault` that stops the browser selecting text instead. This was masked as 7
   "unhandled errors" in an otherwise green unit run.
+- 2026-09-04 — The merge queue's ↑/↓ move the row out from under the pointer, so a second mouse click at
+  the same spot acts on whichever document took that position. With ↓ this swaps the two back, which looks
+  like the button did nothing — the likely explanation for a "very lagging" report that could not be
+  reproduced (10 presses measured at a 42 ms mean). Focus follows the document, so the keyboard is
+  unaffected; only repeated mouse clicks at one spot are. Left as it stands pending a decision, because
+  the alternatives are design changes rather than fixes: move the arrows out of the rows so they act on a
+  selected document, or leave dragging as the gesture for a long move.
