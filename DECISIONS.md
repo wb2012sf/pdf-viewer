@@ -318,3 +318,14 @@ One line per assumption made instead of interrupting a session, newest last.
   unaffected; only repeated mouse clicks at one spot are. Left as it stands pending a decision, because
   the alternatives are design changes rather than fixes: move the arrows out of the rows so they act on a
   selected document, or leave dragging as the gesture for a long move.
+- 2026-09-10 — **Open, needs a decision.** The viewer's own Thumbnails tab draws a rotated page at half
+  the scale of an upright one (measured; see `KNOWN-ISSUES.md`). Hiding that tab is the preferred
+  direction — it duplicates the Pages panel and has now produced five reports that were not about our
+  code — but it cannot be hidden on its own: Thumbnails is the sidebar's default tab, so removing the
+  button leaves its panel showing with no way off it. The two ways out are to hide the whole sidebar,
+  losing outline/bookmark navigation with it, or to hide the tab and have a watcher select Outline when
+  the sidebar opens, which patches the component's state rather than its appearance. Not chosen yet.
+- 2026-09-11 — The desktop app is being tried on Linux for the first time, from a copy of the repo at
+  `~/dev_projects/` on a Linux desktop. It has only ever been verified on Windows, and Linux uses
+  WebKitGTK rather than WebView2 — the layer where the two previous webview-only defects lived. Treat
+  results from there as first-run findings rather than regressions.

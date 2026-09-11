@@ -195,6 +195,42 @@ told apart by looking, which is the actual problem; the viewer's tab is part of
 a `tabs` schema entry carrying no `categories`, so `disabledCategories` cannot
 remove it, and overriding `ui.schema` wholesale is the same trap that `commands`
 turned out to be.
+
+#### A rotated page looks tiny in it — measured 2026-09-10
+
+A fifth report against this tab, and a real defect, but the viewer's rather than
+ours. It sizes every thumbnail to a **fixed width** and derives the height from
+the page's aspect, so a rotated page's long edge gets the width a portrait
+page's *short* edge gets — half the scale:
+
+| | natural | rendered |
+| --- | --- | --- |
+| portrait | 150×300 | 146×**292** |
+| rotated to landscape | 297×150 | 146×**69** |
+
+It is the mirror of the bug our own panel had (we constrained height, they
+constrain width); `79dd059` fixed ours by fitting every preview into one square
+box. The aspect ratio is correct in both — only the scale is wrong.
+
+The sidebar is **249px wide while thumbnails are hardcoded to 150px**, so a
+third of the column is unused. A square box at full column width would put
+portrait at 124×249 (about 15% smaller than now) and landscape at 249×124.
+
+What a patch would have to work with, since none of this is configurable:
+
+- The thumbnail `<img>` and its wrapper carry **no CSS classes at all** — they
+  are bare `<div>`s, so any styling patch has to select them by nesting position
+  and will break silently on an upstream markup change.
+- The two sidebar tabs *are* `<button role="tab">` inside
+  `div.bg-bg-surface.mx-4.my-4.flex`, which is a stable enough selector. Tab 0
+  is Thumbnails, tab 1 is Outline.
+- **Thumbnails is selected by default** (`aria-selected="true"`), so hiding that
+  tab button alone leaves the panel still showing thumbnails with no way to
+  switch away. Hiding it properly means either removing the whole sidebar — the
+  Outline tab with it — or adding a watcher that selects Outline when the
+  sidebar opens, which patches the component's state and not merely its looks.
+
+Decision pending; see `DECISIONS.md`.
 ## Reporting these upstream
 
 Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste issues
