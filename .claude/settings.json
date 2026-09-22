@@ -1,5 +1,16 @@
 {
   "permissions": {
-    "deny": ["Bash(git push:*)"]
+    "allow": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git push origin --force:*)",
+      "Bash(git push origin --delete:*)"
+    ]
   }
 }

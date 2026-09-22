@@ -6,7 +6,11 @@ Last reviewed: 2026-08-30. Update this file whenever a decision below changes; d
 
 - Remote: https://github.com/wb2012sf/pdf-viewer (private).
 - Default branch: `main`.
-- `git push` is denied for Claude Code by `.claude/settings.json` regardless of permission mode (see Working agreements below) — pushing is done by the user, not by Claude Code, until that policy changes.
+- Claude Code may `git push` without asking. **Force-pushing and remote deletion are denied** by `.claude/settings.json` — `--force`, `-f`, `--force-with-lease`, `--mirror` and `--delete`. A push may add to a remote branch; it may never overwrite or remove one.
+- That deny matches command spellings, so it stops the ordinary force-push and not an exotic equivalent (`git push origin +main`). It is a guard rail, not a sandbox; the rule below is what actually holds.
+- **Work on a branch, not on `main`.** Anything that changes behaviour — a feature, a fix, a refactor — starts with `git checkout -b claude/<short-name>` and is pushed there. `main` is written to only when the user asks for it in as many words. Pushing `main` is *not* blocked by settings, so this is a rule Claude Code keeps rather than a fence that stops it.
+- Docs-only, comment-only or config-only changes may go straight to `main`: there is nothing to review in isolation and a branch would cost more than it explains.
+- Pushing a branch is not the same as opening a pull request. `gh pr create` is a separate, outward-facing act and needs its own go-ahead.
 
 ## Purpose
 
@@ -32,7 +36,7 @@ The goal is long, uninterrupted work sessions. Default to proceeding on your bes
 ### Stop and ask when:
 
 - The action deletes or overwrites data that lives outside version control and can't be recovered from git (files elsewhere on the machine, VPS or local, rows in a non-test database, remote objects).
-- The action pushes to any branch other than the current feature branch, force-pushes, or merges into `main`.
+- The action pushes to `main`, force-pushes, deletes a remote branch, or merges anything into `main`. Pushing the current `claude/*` feature branch is routine and needs no permission.
 - The action would incur a real monetary cost (provisioning paid infrastructure, upgrading a paid tier, registering a domain).
 - The change alters a public-facing contract in a way that breaks previously saved user data — specifically, anything that would make a PDF annotated or saved by an earlier version of this tool fail to open correctly later. Backward compatibility of saved files is treated as a hard constraint, not a style preference.
 - Two materially different architectural directions are both defensible and picking wrong would mean discarding substantial completed work. A naming choice or a local refactor is never this; a decision that reshapes several modules is.
