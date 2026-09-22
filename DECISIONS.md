@@ -366,3 +366,9 @@ One line per assumption made instead of interrupting a session, newest last.
   filename keeps a 6 rem floor instead of `min-width: 0`. Adding the reduction summary to that row squeezed
   `photo.pdf` down to "p…" and then broke every button onto two lines. A bar that runs out of room should
   break *between* its controls.
+- 2026-09-22 — A reduced document is renamed `<name>-reduced.pdf`; one that came back unchanged keeps its
+  own name. The reduction was replacing the open document while keeping its filename, which pre-fills the
+  Save dialog with the original's name — and one click through that dialog in the original's folder
+  overwrites a file whose high-resolution images cannot be recovered. This is the rule merge already
+  follows (`merged.pdf`, 2026-09-01) and extract and split already follow (`-pages.pdf`, `-part-N.pdf`):
+  a derived document gets a derived name. Reducing twice does not stack the suffix.

@@ -137,7 +137,9 @@ What it will and will not touch:
   original, the original is what you keep, and the toolbar says so.
 
 Nothing is written to disk until **Save**, as with every other operation here, so a result you do not like
-costs a Close rather than a lost file.
+costs a Close rather than a lost file. A document that *was* reduced is renamed `<name>-reduced.pdf`, so the
+Save dialog cannot offer to write it over the original — the discarded resolution is not recoverable. A
+document that was left unchanged keeps its name, having nothing to be protected from.
 
 ## OCR
 

@@ -8,7 +8,7 @@ import { MergeDialog } from './components/MergeDialog';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { ReduceSizeDialog } from './components/ReduceSizeDialog';
-import { reductionSummary, type SizePreset } from './components/reduce-size-presets';
+import { reducedFileName, reductionSummary, type SizePreset } from './components/reduce-size-presets';
 import { useOcr } from './hooks/useOcr';
 import { usePageOps, type PageOperation } from './hooks/usePageOps';
 import { useThumbnails } from './hooks/useThumbnails';
@@ -393,7 +393,13 @@ export function App(): React.JSX.Element {
         setReduceOpen(false);
         // Nothing was gained, so the viewer stays on the document it is already
         // showing rather than being remounted on identical bytes.
-        if (report.changed) replaceDocument(openDocumentFrom(document.name, report.pdf), true);
+        //
+        // Renamed when it did change: a reduction throws pixels away for good,
+        // and handing it back under the original's name pre-fills the Save
+        // dialog with that name. One click through it and the original is gone.
+        if (report.changed) {
+          replaceDocument(openDocumentFrom(reducedFileName(document.name), report.pdf), true);
+        }
         // After `replaceDocument`, which clears the summary of the *previous*
         // document: this one describes the document that just replaced it.
         setReduceSummary(reductionSummary(report));

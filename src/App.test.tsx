@@ -224,6 +224,34 @@ describe('reducing the file size', () => {
     );
   });
 
+  it('renames the result so Save cannot offer to overwrite the original', async () => {
+    // The reduction is lossy. If the Save dialog opens pre-filled with
+    // "report.pdf", one click in the original's folder destroys it.
+    vi.mocked(compressPdf).mockResolvedValue(report());
+    await openTheDialog();
+
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    await screen.findByTestId('reduce-summary');
+    await waitFor(() =>
+      expect(screen.getByTestId('open-filename').textContent).toBe('report-reduced.pdf'),
+    );
+  });
+
+  it('keeps the original name when nothing was reduced', async () => {
+    // Nothing was thrown away, so there is nothing to protect the original from
+    // and no reason to rename the document the user is still working on.
+    vi.mocked(compressPdf).mockResolvedValue(
+      report({ changed: false, newSize: 8 * 1024 * 1024, imagesDownsampled: 0 }),
+    );
+    await openTheDialog();
+
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    await screen.findByTestId('reduce-summary');
+    expect(screen.getByTestId('open-filename').textContent).toBe('report.pdf');
+  });
+
   it('leaves the document alone when there was nothing to gain', async () => {
     vi.mocked(compressPdf).mockResolvedValue(
       report({ changed: false, newSize: 8 * 1024 * 1024, imagesDownsampled: 0 }),

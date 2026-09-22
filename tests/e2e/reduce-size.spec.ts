@@ -19,8 +19,14 @@ async function open(page: Page, file: string): Promise<void> {
   await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
 }
 
-/** Every image XObject in the document the viewer is currently holding. */
-async function savedImages(page: Page): Promise<{ width: number; height: number; bytes: number }[]> {
+interface SavedDocument {
+  /** The name the save was offered under — what a Save dialog would pre-fill. */
+  filename: string;
+  images: { width: number; height: number; bytes: number }[];
+}
+
+/** Saves the open document and reads back what actually landed. */
+async function save(page: Page): Promise<SavedDocument> {
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 60_000 }),
     page.getByTestId('save').click(),
@@ -39,17 +45,18 @@ async function savedImages(page: Page): Promise<{ width: number; height: number;
       bytes: object.contents.byteLength,
     });
   }
-  return images;
+  return { filename: download.suggestedFilename(), images };
 }
 
 test.describe('reducing the file size', () => {
   test('downsamples the photograph and says how much it saved', async ({ page }) => {
     await open(page, PHOTO_PDF);
 
-    const before = await savedImages(page);
-    expect(before).toHaveLength(1);
+    const before = await save(page);
+    expect(before.images).toHaveLength(1);
+    expect(before.filename).toBe('photo.pdf');
     // The fixture: 2448x3168 px filling an 11 in page, so 288 DPI.
-    expect(before[0]?.width).toBe(2448);
+    expect(before.images[0]?.width).toBe(2448);
 
     await page.getByTestId('open-reduce').click();
     await expect(page.getByTestId('reduce-dialog')).toBeVisible();
@@ -70,13 +77,16 @@ test.describe('reducing the file size', () => {
     await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
     await page.screenshot({ path: 'test-results/screenshots/reduce-complete.png', fullPage: true });
 
-    const after = await savedImages(page);
-    expect(after).toHaveLength(1);
+    const after = await save(page);
+    expect(after.images).toHaveLength(1);
+    // The reduction is lossy, so it must not be offered back under the name of
+    // the file it was made from — saving over that original is unrecoverable.
+    expect(after.filename).toBe('photo-reduced.pdf');
     // 3168 px over 11 in reduced to 72 DPI is 792 px on the long edge.
-    expect(after[0]?.height).toBeLessThanOrEqual(820);
-    expect(after[0]?.height).toBeGreaterThan(700);
+    expect(after.images[0]?.height).toBeLessThanOrEqual(820);
+    expect(after.images[0]?.height).toBeGreaterThan(700);
     // The point of the whole exercise.
-    expect(after[0]?.bytes).toBeLessThan((before[0]?.bytes ?? 0) / 2);
+    expect(after.images[0]?.bytes).toBeLessThan((before.images[0]?.bytes ?? 0) / 2);
   });
 
   test('says plainly when a document has no images to reduce', async ({ page }) => {
@@ -103,8 +113,10 @@ test.describe('reducing the file size', () => {
       timeout: 60_000,
     });
 
-    const after = await savedImages(page);
-    expect(after[0]?.width).toBe(2448);
+    const after = await save(page);
+    expect(after.images[0]?.width).toBe(2448);
+    // Nothing was thrown away, so there is nothing to rename away from.
+    expect(after.filename).toBe('photo.pdf');
     expect(originalSize).toBeGreaterThan(0);
   });
 });

@@ -83,3 +83,27 @@ export function reductionSummary(report: CompressionReport): string {
   const saved = Math.round((1 - report.newSize / report.originalSize) * 100);
   return `${formatSize(report.originalSize)} → ${formatSize(report.newSize)} (${String(saved)}% smaller)`;
 }
+
+/** Marker appended to a reduced document's name. */
+const REDUCED_SUFFIX = '-reduced';
+
+/**
+ * What to call the reduced copy of `name`.
+ *
+ * A reduction is lossy and cannot be undone: offering it back under the
+ * original's name pre-fills the Save dialog with that name, and one click
+ * through it in the original's folder destroys the high-resolution images for
+ * good. The same reasoning names a merged document `merged.pdf` and an
+ * extracted one `-pages.pdf` — a derived document gets a derived name.
+ */
+export function reducedFileName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  // A leading dot is a hidden file, not an extension.
+  const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+
+  // Reducing twice is a legitimate thing to do — at a lower resolution, or
+  // after annotating — and "-reduced-reduced.pdf" says nothing the first one did not.
+  if (stem.endsWith(REDUCED_SUFFIX)) return name;
+
+  return `${stem}${REDUCED_SUFFIX}${extension}`;
+}
