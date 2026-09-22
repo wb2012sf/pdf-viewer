@@ -329,3 +329,40 @@ One line per assumption made instead of interrupting a session, newest last.
   `~/dev_projects/` on a Linux desktop. It has only ever been verified on Windows, and Linux uses
   WebKitGTK rather than WebView2 — the layer where the two previous webview-only defects lived. Treat
   results from there as first-run findings rather than regressions.
+- 2026-09-22 — Size reduction downsamples **only `DCTDecode` (JPEG) image streams**. Everything else — Flate
+  bitmaps, CCITT and JBIG2 scans, JPEG 2000 — is counted and left untouched. The stream bytes of a JPEG
+  *are* a JPEG file, so the browser decodes and re-encodes them directly; every other encoding would have to
+  be unpacked into samples, interpreted against its colour space and bit depth, and packed again by hand.
+  That is where the bugs and the quality losses would be, and it is not where a large PDF's megabytes
+  usually are — those are photographs and camera scans, which are JPEG.
+- 2026-09-22 — An image's effective resolution is estimated against the **whole page it is drawn on**, not
+  the box it is actually placed in, which would mean tracking every content stream's transformation
+  matrices. The error only runs one way: an image filling a quarter of the page reads as a lower DPI than it
+  really is, so it is downsampled too little rather than too much. Under-reducing is a disappointment;
+  over-reducing is damage. Images reused across pages are measured against the largest of them.
+- 2026-09-22 — Images reachable only through an **annotation's appearance stream** (a stamp, a placed
+  signature) are left alone: nothing walks `/Annots` looking for them. They are typically small, and
+  typically PNG — that is, Flate, which is skipped anyway. Worth revisiting only if a signature photo ever
+  turns out to be what is making someone's file large.
+- 2026-09-22 — A reduction that does not pay for itself is **discarded rather than kept**, at two levels: an
+  individual image whose re-encode came out no smaller keeps its original bytes, and a document that came
+  out no smaller is thrown away and the original returned with `changed: false`. "Reduce size" handing back
+  a bigger file is the kind of bug a user has to notice for themselves.
+- 2026-09-22 — A re-encoded image is written as `/DeviceRGB`, 8 bits per component, with `/DecodeParms`
+  dropped, because that is what a canvas hands back whatever went in. Images carrying a `/Decode` array or
+  `/ImageMask` are skipped instead — a canvas round trip silently loses both.
+- 2026-09-22 — The resolution is offered as three named presets (Screen 72 / Balanced 150 / Print 300)
+  rather than a DPI field, with the number shown beside each name. "What is this file for" is a question
+  anyone can answer; "how many dots per inch" is not. The DPI is still visible so that someone who does know
+  need not guess which preset hides which number.
+- 2026-09-22 — `load` in `page-ops.ts` is exported as `loadPdf` and shared with `compress.ts`, rather than
+  compression opening documents its own way. Both have to refuse encrypted and unparseable files for the
+  same reasons, and a second loader would eventually drift from the first.
+- 2026-09-22 — The `photo.pdf` end-to-end fixture's JPEG is produced by **Playwright's Chromium**, inside
+  `make-fixture-pdf.mjs`. Node cannot encode JPEG without a new dependency, and encoding JPEG in a browser
+  is precisely what the feature does. Deliberately kept to ~190 KB: it is a committed binary, and every
+  other fixture in that directory is under 51 KB.
+- 2026-09-22 — The toolbar now wraps as a row (`flex-wrap`), buttons never break their own labels, and the
+  filename keeps a 6 rem floor instead of `min-width: 0`. Adding the reduction summary to that row squeezed
+  `photo.pdf` down to "p…" and then broke every button onto two lines. A bar that runs out of room should
+  break *between* its controls.

@@ -47,6 +47,7 @@ body {
 
 .workbench__bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
@@ -60,7 +61,9 @@ body {
 
 .workbench__filename {
   flex: 1;
-  min-width: 0;
+  /* Not 0: a status message sharing the bar would otherwise shrink the
+     document's name away to "p…", which identifies nothing. */
+  min-width: 6rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -82,6 +85,7 @@ body {
 
 .workbench__button {
   padding: 0.375rem 0.75rem;
+  white-space: nowrap;
   border: 1px solid var(--workbench-border);
   border-radius: 0.375rem;
   background: var(--workbench-bg);
@@ -634,4 +638,79 @@ body {
 
 .merge__item--drop-after {
   box-shadow: inset 0 -2px 0 0 var(--workbench-accent);
+}
+
+.dialog--reduce {
+  width: 26rem;
+}
+
+.reduce__presets {
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 0;
+}
+
+.reduce__legend {
+  padding: 0;
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reduce__preset {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.5rem;
+  align-items: baseline;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--workbench-border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.reduce__preset:has(input:checked) {
+  border-color: var(--workbench-accent);
+}
+
+.reduce__preset:has(input:focus-visible) {
+  outline: 2px solid var(--workbench-accent);
+  outline-offset: 2px;
+}
+
+.reduce__preset-label {
+  font-size: 0.875rem;
+}
+
+.reduce__dpi {
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+}
+
+.reduce__preset-description {
+  grid-column: 2;
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.reduce__presets:disabled .reduce__preset {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.reduce__progress {
+  margin-right: auto;
+  align-self: center;
+  color: var(--workbench-muted);
+  font-size: 0.8125rem;
+}
+
+.workbench__reduce-summary {
+  /* One sentence, and it must not push the filename or the buttons around. */
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

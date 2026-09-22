@@ -7,6 +7,8 @@ import { DropZone } from './components/DropZone';
 import { MergeDialog } from './components/MergeDialog';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
+import { ReduceSizeDialog } from './components/ReduceSizeDialog';
+import { reductionSummary, type SizePreset } from './components/reduce-size-presets';
 import { useOcr } from './hooks/useOcr';
 import { usePageOps, type PageOperation } from './hooks/usePageOps';
 import { useThumbnails } from './hooks/useThumbnails';
@@ -22,6 +24,8 @@ import {
   splitPointsToRanges,
   rotatePages,
 } from './lib/pdf/page-ops';
+import { compressPdf } from './lib/pdf/compress';
+import { resampleImage } from './lib/pdf/image-resampler';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
@@ -75,6 +79,12 @@ export function App(): React.JSX.Element {
   const mergeQueue = useMergeQueue();
   const [mergeOpen, setMergeOpen] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [reduceOpen, setReduceOpen] = useState(false);
+  const [reducing, setReducing] = useState(false);
+  const [reduceProgress, setReduceProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [reduceError, setReduceError] = useState<string | null>(null);
+  /** What the last size reduction achieved, shown until the document changes. */
+  const [reduceSummary, setReduceSummary] = useState<string | null>(null);
   const mergeInputRef = useRef<HTMLInputElement>(null);
   const openPdfRef = useRef<OpenPdfHandle>(null);
   // Split produces several documents where a page operation yields one, so the
@@ -108,6 +118,7 @@ export function App(): React.JSX.Element {
   const replaceDocument = useCallback((next: OpenDocument | null, edited: boolean): void => {
     setRegistry(null);
     setSaveError(null);
+    setReduceSummary(null);
     // Page indices from the old document mean nothing in the new one.
     setSelected(new Set());
     setEditedSinceSave(edited);
@@ -354,6 +365,50 @@ export function App(): React.JSX.Element {
     [runPageOp, rotations.length],
   );
 
+  /**
+   * Downsamples the images in the open document and reopens the viewer on the
+   * result.
+   *
+   * Deliberately not routed through `usePageOps`: the interesting part of a
+   * reduction is the report — what it saved, and whether it saved anything at
+   * all — and a hook that hands back only the new bytes would throw that away.
+   */
+  const handleReduceSize = useCallback(
+    async (preset: SizePreset) => {
+      if (!registry || !document) return;
+
+      setReducing(true);
+      setReduceError(null);
+      setReduceProgress(null);
+      try {
+        // The document as it stands, so anything annotated since it was opened
+        // is reduced along with it rather than being discarded.
+        const report = await compressPdf(await currentDocumentBytes(registry), {
+          targetDpi: preset.dpi,
+          quality: preset.quality,
+          resample: resampleImage,
+          onProgress: (completed, total) => setReduceProgress({ completed, total }),
+        });
+
+        setReduceOpen(false);
+        // Nothing was gained, so the viewer stays on the document it is already
+        // showing rather than being remounted on identical bytes.
+        if (report.changed) replaceDocument(openDocumentFrom(document.name, report.pdf), true);
+        // After `replaceDocument`, which clears the summary of the *previous*
+        // document: this one describes the document that just replaced it.
+        setReduceSummary(reductionSummary(report));
+      } catch (cause) {
+        // Kept in the dialog rather than closing it, so the choice is still
+        // there to try at a different resolution.
+        setReduceError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setReducing(false);
+        setReduceProgress(null);
+      }
+    },
+    [registry, document, replaceDocument],
+  );
+
   const handleMergeQueue = useCallback(async () => {
     setMerging(true);
     try {
@@ -528,6 +583,33 @@ export function App(): React.JSX.Element {
                 {saveError}
               </span>
             )}
+            {reduceSummary !== null && (
+              <span
+                className="workbench__ocr-status workbench__reduce-summary"
+                role="status"
+                title={reduceSummary}
+                data-testid="reduce-summary"
+              >
+                {reduceSummary}
+              </span>
+            )}
+            <button
+              type="button"
+              className="workbench__button"
+              onClick={() => {
+                setReduceError(null);
+                setReduceOpen(true);
+              }}
+              disabled={registry === null}
+              data-testid="open-reduce"
+              title={
+                registry === null
+                  ? 'Waiting for the viewer to finish loading'
+                  : 'Make this file smaller by lowering image resolution'
+              }
+            >
+              Reduce size…
+            </button>
             <button
               type="button"
               className="workbench__button"
@@ -588,6 +670,16 @@ export function App(): React.JSX.Element {
             setMergeOpen(false);
             mergeQueue.clear();
           }}
+        />
+      )}
+
+      {reduceOpen && (
+        <ReduceSizeDialog
+          busy={reducing}
+          progress={reduceProgress}
+          error={reduceError}
+          onReduce={(preset) => void handleReduceSize(preset)}
+          onCancel={() => setReduceOpen(false)}
         />
       )}
 

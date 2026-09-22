@@ -10,7 +10,7 @@ Last reviewed: 2026-08-30. Update this file whenever a decision below changes; d
 
 ## Purpose
 
-A cross-platform tool that replicates the PDF functionality of macOS Preview: view, search, annotate (highlight, note, freehand, shapes), fill existing form fields, stamp a signature image, merge/split/reorder/rotate/extract pages, and OCR scanned pages into searchable text. It is not an Acrobat replacement and should not grow toward reflowable text editing, forms design, or certificate-based signing unless a future decision explicitly says otherwise.
+A cross-platform tool that replicates the PDF functionality of macOS Preview: view, search, annotate (highlight, note, freehand, shapes), fill existing form fields, stamp a signature image, merge/split/reorder/rotate/extract pages, reduce a file's size by downsampling its images, and OCR scanned pages into searchable text. It is not an Acrobat replacement and should not grow toward reflowable text editing, forms design, or certificate-based signing unless a future decision explicitly says otherwise.
 
 **No Docker, anywhere, and no required server.** The app must run for someone who has only downloaded or been handed it, with nothing else installed, not Docker, not a VPS, not a separate backend. This is a hard constraint, not a preference: it changed the OCR approach (see Stack) and rules out Docker Compose as the deployment model entirely, superseding the earlier VPS/WSL-Compose framing.
 

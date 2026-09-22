@@ -7,8 +7,12 @@ export type Rotation = 0 | 90 | 180 | 270;
 /**
  * Loads a PDF for structural editing, refusing anything this tool cannot
  * faithfully write back out.
+ *
+ * Exported because every operation on a document — the page ops here, the size
+ * reduction in `compress.ts` — has to refuse the same files for the same
+ * reasons, and a second loader would drift from this one.
  */
-async function load(bytes: Uint8Array, label: string): Promise<PDFDocument> {
+export async function loadPdf(bytes: Uint8Array, label: string): Promise<PDFDocument> {
   assertPdfBytes(bytes, label);
 
   let doc: PDFDocument;
@@ -36,7 +40,7 @@ async function load(bytes: Uint8Array, label: string): Promise<PDFDocument> {
 
 /** Number of pages in `bytes`. */
 export async function getPageCount(bytes: Uint8Array): Promise<number> {
-  const doc = await load(bytes, 'document');
+  const doc = await loadPdf(bytes, 'document');
   return doc.getPageCount();
 }
 
@@ -54,7 +58,7 @@ export async function mergePdfs(documents: readonly Uint8Array[]): Promise<Uint8
 
   const merged = await PDFDocument.create();
   for (const [position, bytes] of documents.entries()) {
-    const source = await load(bytes, `merge input ${String(position + 1)}`);
+    const source = await loadPdf(bytes, `merge input ${String(position + 1)}`);
     const pages = await merged.copyPages(source, source.getPageIndices());
     for (const page of pages) {
       merged.addPage(page);
@@ -70,7 +74,7 @@ export async function mergePdfs(documents: readonly Uint8Array[]): Promise<Uint8
  * primitive behind extract, reorder and split.
  */
 export async function extractPages(bytes: Uint8Array, pageIndices: readonly number[]): Promise<Uint8Array> {
-  const source = await load(bytes, 'document');
+  const source = await loadPdf(bytes, 'document');
   assertPageIndices(pageIndices, source.getPageCount(), 'extract');
 
   const output = await PDFDocument.create();
@@ -88,7 +92,7 @@ export async function extractPages(bytes: Uint8Array, pageIndices: readonly numb
  * refused rather than written.
  */
 export async function removePages(bytes: Uint8Array, pageIndices: readonly number[]): Promise<Uint8Array> {
-  const source = await load(bytes, 'document');
+  const source = await loadPdf(bytes, 'document');
   const pageCount = source.getPageCount();
   assertPageIndices(pageIndices, pageCount, 'remove');
 
@@ -150,7 +154,7 @@ export function orderWithPageMoved(pageCount: number, from: number, to: number):
  * so that reordering can never silently drop a page.
  */
 export async function reorderPages(bytes: Uint8Array, order: readonly number[]): Promise<Uint8Array> {
-  const source = await load(bytes, 'document');
+  const source = await loadPdf(bytes, 'document');
   const pageCount = source.getPageCount();
   assertPageIndices(order, pageCount, 'reorder');
 
@@ -196,7 +200,7 @@ export async function splitPdf(
   bytes: Uint8Array,
   ranges: readonly (readonly [start: number, end: number])[],
 ): Promise<Uint8Array[]> {
-  const source = await load(bytes, 'document');
+  const source = await loadPdf(bytes, 'document');
   const pageCount = source.getPageCount();
 
   if (ranges.length === 0) {
@@ -225,7 +229,7 @@ export async function rotatePages(
   pageIndices: readonly number[],
   rotation: Rotation,
 ): Promise<Uint8Array> {
-  const doc = await load(bytes, 'document');
+  const doc = await loadPdf(bytes, 'document');
   assertPageIndices(pageIndices, doc.getPageCount(), 'rotate');
 
   for (const index of pageIndices) {
@@ -238,6 +242,6 @@ export async function rotatePages(
 
 /** Rotation currently stored on each page, in document order. */
 export async function getPageRotations(bytes: Uint8Array): Promise<number[]> {
-  const doc = await load(bytes, 'document');
+  const doc = await loadPdf(bytes, 'document');
   return doc.getPages().map((page) => page.getRotation().angle);
 }

@@ -2,6 +2,7 @@ import {
   PDFArray,
   PDFDocument,
   PDFHexString,
+  PDFName,
   PDFRawStream,
   StandardFonts,
   decodePDFRawStream,
@@ -108,4 +109,123 @@ export async function pageContentStream(bytes: Uint8Array, pageIndex: number): P
   return streams
     .map((stream) => (stream instanceof PDFRawStream ? decoder.decode(decodePDFRawStream(stream).decode()) : ''))
     .join('\n');
+}
+
+/** An image XObject to embed with {@link makeImagePdf}. */
+export interface FixtureImage {
+  /** Pixel dimensions recorded on the stream. */
+  width: number;
+  height: number;
+  /** Stream filter. Defaults to `DCTDecode`, the only one compression rewrites. */
+  filter?: string;
+  /** Stream bytes. Defaults to filler of `byteLength`, or 2 KB. */
+  data?: Uint8Array;
+  byteLength?: number;
+  /** Extra entries merged into the image dictionary (`Decode`, `ImageMask`, …). */
+  extra?: Record<string, unknown>;
+  /** Registered but never drawn, to stand for an orphaned image. */
+  unplaced?: boolean;
+  /** Drawn through an intermediate Form XObject rather than straight onto the page. */
+  viaForm?: boolean;
+}
+
+export interface ImagePdfOptions {
+  /** Page size in points. Defaults to a 612x792 US Letter page. */
+  pageSize?: [width: number, height: number];
+}
+
+/**
+ * Builds a PDF carrying image XObjects described byte for byte.
+ *
+ * Deliberately hand-assembled rather than going through `embedJpg`: the size
+ * reduction has to be judged on what is *written into the file* — the stream's
+ * `/Width`, `/Filter` and length — and pdf-lib will not embed an image whose
+ * bytes are not a real JPEG. Nothing here decodes them, so filler is enough.
+ */
+export async function makeImagePdf(
+  images: readonly FixtureImage[],
+  options: ImagePdfOptions = {},
+): Promise<Uint8Array> {
+  const [pageWidth, pageHeight] = options.pageSize ?? [612, 792];
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([pageWidth, pageHeight]);
+
+  for (const [index, image] of images.entries()) {
+    const data = image.data ?? fillerBytes(image.byteLength ?? 2048, index);
+    const stream = PDFRawStream.of(
+      doc.context.obj({
+        Type: 'XObject',
+        Subtype: 'Image',
+        Width: image.width,
+        Height: image.height,
+        ColorSpace: 'DeviceRGB',
+        BitsPerComponent: 8,
+        Filter: image.filter ?? 'DCTDecode',
+        Length: data.length,
+        ...(image.extra ?? {}),
+      }),
+      data,
+    );
+    const ref = doc.context.register(stream);
+    if (image.unplaced === true) continue;
+
+    const name = PDFName.of(`Im${String(index)}`);
+    if (image.viaForm === true) {
+      // A form XObject that draws the image, so the walk has to descend through
+      // its own resources to find it at all.
+      const form = PDFRawStream.of(
+        doc.context.obj({
+          Type: 'XObject',
+          Subtype: 'Form',
+          BBox: [0, 0, pageWidth, pageHeight],
+          Resources: { XObject: { [`Im${String(index)}`]: ref } },
+          Length: 0,
+        }),
+        new Uint8Array(),
+      );
+      page.node.setXObject(PDFName.of(`Fm${String(index)}`), doc.context.register(form));
+    } else {
+      page.node.setXObject(name, ref);
+    }
+  }
+  return doc.save();
+}
+
+/** Compressible-looking filler: distinct per image, so streams stay identifiable. */
+function fillerBytes(length: number, seed: number): Uint8Array {
+  return Uint8Array.from({ length }, (_unused, index) => (index * 7 + seed * 31) % 251);
+}
+
+/** Every image XObject in `bytes`, as it was actually written to the file. */
+export interface ImageStreamInfo {
+  width: number;
+  height: number;
+  filter: string;
+  /** `/Length` as recorded in the dictionary. */
+  declaredLength: number;
+  /** Bytes actually held by the stream. */
+  byteLength: number;
+  bytes: Uint8Array;
+}
+
+export async function imageStreams(bytes: Uint8Array): Promise<ImageStreamInfo[]> {
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const found: ImageStreamInfo[] = [];
+
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFRawStream)) continue;
+    if (String(object.dict.get(PDFName.of('Subtype'))) !== '/Image') continue;
+
+    found.push({
+      width: Number(object.dict.get(PDFName.of('Width'))?.toString() ?? 0),
+      height: Number(object.dict.get(PDFName.of('Height'))?.toString() ?? 0),
+      filter: String(object.dict.get(PDFName.of('Filter'))),
+      declaredLength: Number(object.dict.get(PDFName.of('Length'))?.toString() ?? 0),
+      byteLength: object.contents.byteLength,
+      bytes: object.contents,
+    });
+  }
+  // Document order is the order they were registered, which is the order the
+  // fixture describes them in.
+  return found;
 }

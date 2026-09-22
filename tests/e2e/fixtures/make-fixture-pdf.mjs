@@ -125,3 +125,60 @@ async function write(name, bytes) {
 
   await write('scanned.pdf', await doc.save());
 }
+
+// A page that is one large photograph, for the size-reduction tests.
+//
+// The JPEG is drawn by Playwright's Chromium rather than by a Node image
+// library: encoding JPEG is exactly what the feature hands to the browser, and
+// this keeps the fixture honest without adding a dependency for a dev script.
+// Deliberately busy — a flat image would compress to almost nothing, and there
+// would be no size to reduce.
+{
+  const { chromium } = await import('@playwright/test');
+  const browser = await chromium.launch();
+  try {
+    const browserPage = await browser.newPage();
+    const dataUrl = await browserPage.evaluate(
+      /* eslint-disable no-undef -- this callback is serialised and run inside Chromium */
+      ([width, height]) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        const sky = ctx.createLinearGradient(0, 0, 0, height);
+        sky.addColorStop(0, '#0b3d91');
+        sky.addColorStop(1, '#f6c445');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height);
+
+        // Fine detail, so the encoder has something to spend bytes on.
+        let seed = 12345;
+        const random = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+        for (let i = 0; i < 700; i += 1) {
+          ctx.fillStyle = `rgb(${random() * 255 | 0},${random() * 255 | 0},${random() * 255 | 0})`;
+          ctx.fillRect(random() * width, random() * height, random() * 40 + 4, random() * 40 + 4);
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(height / 12)}px sans-serif`;
+        ctx.fillText('PHOTO', width * 0.1, height * 0.55);
+
+        return canvas.toDataURL('image/jpeg', 0.8);
+      },
+      /* eslint-enable no-undef */
+      [2448, 3168],
+    );
+
+    const jpeg = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
+    const doc = await PDFDocument.create();
+    // US Letter, so 3168 px on the 11 in edge is a 288 DPI image.
+    const page = doc.addPage([612, 792]);
+    const embedded = await doc.embedJpg(jpeg);
+    page.drawImage(embedded, { x: 0, y: 0, width: 612, height: 792 });
+
+    await write('photo.pdf', await doc.save());
+  } finally {
+    await browser.close();
+  }
+}

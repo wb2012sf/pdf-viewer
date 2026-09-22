@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { App } from './App';
+import { compressPdf, type CompressionReport } from './lib/pdf/compress';
 
 /**
  * The real viewer needs a browser, WASM and a canvas, none of which belong in a
@@ -10,6 +11,14 @@ import { App } from './App';
  * has set up — which is the only part of it `App` actually talks to.
  */
 let registry: unknown = null;
+
+// Compression itself needs a canvas, and is covered against real PDF bytes in
+// `lib/pdf/compress.test.ts`. What App owns is what happens around it.
+// `importOriginal` keeps the module's constants, which the dialog reads.
+vi.mock('./lib/pdf/compress', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./lib/pdf/compress')>()),
+  compressPdf: vi.fn(),
+}));
 
 vi.mock('@embedpdf/react-pdf-viewer', () => ({
   PDFViewer: ({ onReady }: { onReady?: (registry: never) => void }) => {
@@ -169,5 +178,96 @@ describe('dropping several files at once', () => {
       expect(screen.getByTestId('open-filename').textContent).toBe('only.pdf');
     });
     expect(screen.queryByTestId('merge-dialog')).toBeNull();
+  });
+});
+
+describe('reducing the file size', () => {
+  /** A plausible report; the compression itself is covered in lib/pdf. */
+  function report(overrides: Partial<CompressionReport> = {}): CompressionReport {
+    return {
+      pdf: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]),
+      originalSize: 8 * 1024 * 1024,
+      newSize: 2 * 1024 * 1024,
+      imagesFound: 4,
+      imagesDownsampled: 4,
+      changed: true,
+      ...overrides,
+    };
+  }
+
+  async function openTheDialog(): Promise<void> {
+    registry = registryWith(workingExporter);
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-reduce').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-reduce'));
+    await screen.findByTestId('reduce-dialog');
+  }
+
+  it('reduces at the chosen resolution and reports what it saved', async () => {
+    vi.mocked(compressPdf).mockResolvedValue(report());
+    await openTheDialog();
+
+    fireEvent.click(screen.getByTestId('reduce-preset-screen'));
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    // The summary has to survive the viewer being reopened on the result —
+    // which clears the summary belonging to the document it replaced.
+    const summary = await screen.findByTestId('reduce-summary');
+    expect(summary.textContent).toContain('8.0 MB → 2.0 MB');
+    expect(screen.queryByTestId('reduce-dialog')).toBeNull();
+
+    expect(vi.mocked(compressPdf)).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.objectContaining({ targetDpi: 72 }),
+    );
+  });
+
+  it('leaves the document alone when there was nothing to gain', async () => {
+    vi.mocked(compressPdf).mockResolvedValue(
+      report({ changed: false, newSize: 8 * 1024 * 1024, imagesDownsampled: 0 }),
+    );
+    await openTheDialog();
+    const urlsBefore = createObjectURL.mock.calls.length;
+
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    expect((await screen.findByTestId('reduce-summary')).textContent).toContain('No further reduction');
+    // Remounting the viewer on bytes identical to the ones it is showing would
+    // lose the reader's place for nothing.
+    expect(createObjectURL.mock.calls.length).toBe(urlsBefore);
+  });
+
+  it('keeps a failure in the dialog, where the choice still is', async () => {
+    vi.mocked(compressPdf).mockRejectedValue(new Error('document: this PDF is password-protected'));
+    await openTheDialog();
+
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    expect((await screen.findByTestId('reduce-error')).textContent).toContain('password-protected');
+    expect(screen.getByTestId('reduce-dialog')).toBeTruthy();
+  });
+
+  it('reduces the document as it currently stands, not the bytes it was opened with', async () => {
+    // Annotations made since the file was opened live in the viewer, and
+    // reducing the original bytes would quietly throw them away.
+    vi.mocked(compressPdf).mockResolvedValue(report());
+    await openTheDialog();
+
+    fireEvent.click(screen.getByTestId('reduce-confirm'));
+
+    await screen.findByTestId('reduce-summary');
+    const [bytes] = vi.mocked(compressPdf).mock.calls[0] ?? [];
+    // What `workingExporter` hands back, rather than the opened file's bytes.
+    expect([...(bytes ?? [])]).toEqual([0x25, 0x50]);
+  });
+
+  it('cannot be reduced before the viewer is ready', async () => {
+    registry = null;
+    render(<App />);
+    await openAFile();
+
+    expect(screen.getByTestId<HTMLButtonElement>('open-reduce').disabled).toBe(true);
   });
 });

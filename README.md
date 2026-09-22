@@ -2,7 +2,7 @@
 
 A cross-platform PDF tool that replicates the PDF functionality of macOS Preview: view, search,
 annotate, fill existing form fields, stamp a signature, merge/split/reorder/rotate/extract pages,
-and OCR scanned pages into searchable text.
+reduce a file's size, and OCR scanned pages into searchable text.
 
 Everything runs on the machine it is opened on. There is no backend, no Docker, and no network
 call at runtime — PDFium (rendering), Tesseract (OCR) and pdf-lib (page operations) all execute in
@@ -73,6 +73,8 @@ src/
   lib/pdf/                 Page operations on real PDF bytes (pdf-lib)
     page-ops.ts            merge / extract / reorder / split / rotate / remove
     errors.ts              Boundary validation for untrusted input
+  lib/pdf/compress.ts      Size reduction: which images to downsample, and how far
+  lib/pdf/image-resampler.ts   The browser half of it: decode, scale, re-encode as JPEG
   lib/ocr/                 Scanned page -> searchable PDF
     recognize.ts           Tesseract worker; browser only
     text-layer.ts          Invisible searchable text via pdf-lib
@@ -104,6 +106,38 @@ Extract is the exception: it produces a new file alongside the original rather t
 the ↑/↓ buttons), and works with nothing open at all — that is the case Append cannot serve. Drop PDFs
 anywhere in the window to open them: one file opens straight away, while several open the merge dialog with
 them queued, so the order can be checked before anything is assembled.
+
+## Reducing file size
+
+**Reduce size…** in the toolbar makes a file smaller by lowering the resolution of the images inside it —
+the same job as Preview's "Reduce File Size". Text, vector drawings and page structure are untouched; only
+image streams are rewritten, so a document stays searchable, selectable and the same shape.
+
+Three presets, with the resolution each one means shown beside it:
+
+| Preset   | Images reduced to | For                                            |
+| -------- | ----------------- | ---------------------------------------------- |
+| Screen   | 72 DPI            | Smallest file. Fine on screen, coarse in print |
+| Balanced | 150 DPI           | Much smaller, still sharp on paper             |
+| Print    | 300 DPI           | Keeps photographic detail. Saves least         |
+
+What it will and will not touch:
+
+- **JPEG (`DCTDecode`) images only.** Flate bitmaps, CCITT and JBIG2 scans and JPEG 2000 are counted and
+  left exactly as they are. A JPEG stream *is* a JPEG file, so the browser decodes and re-encodes it
+  directly; the others would have to be unpacked and repacked by hand, and that is not where a large PDF's
+  megabytes usually are.
+- **Images already at or below the target are skipped**, as are images carrying a `/Decode` array or
+  `/ImageMask`, and any the platform cannot decode (a CMYK JPEG, say). Each one is left alone rather than
+  risked.
+- **Resolution is judged against the whole page** an image is drawn on rather than the box it actually
+  occupies. The error only runs one way — a small image reads as lower resolution than it is, and is
+  reduced too little rather than too much.
+- **A reduction that gains nothing is thrown away.** If the rewritten document is not smaller than the
+  original, the original is what you keep, and the toolbar says so.
+
+Nothing is written to disk until **Save**, as with every other operation here, so a result you do not like
+costs a Close rather than a lost file.
 
 ## OCR
 
