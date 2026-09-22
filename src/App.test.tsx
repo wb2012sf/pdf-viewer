@@ -299,3 +299,90 @@ describe('reducing the file size', () => {
     expect(screen.getByTestId<HTMLButtonElement>('open-reduce').disabled).toBe(true);
   });
 });
+
+describe('naming a document this app has changed', () => {
+  /** A registry whose viewer reports edits of its own, as annotating makes it. */
+  function registryWithViewerEdits(canUndo: boolean): unknown {
+    return {
+      getEngine: () => ({}),
+      getPlugin: (id: string) => {
+        if (id === 'export') return workingExporter;
+        if (id === 'history') return { provides: () => ({ canUndo: () => canUndo }) };
+        return null;
+      },
+    };
+  }
+
+  /** The names handed to the browser's download, in order. */
+  function captureSavedNames(): string[] {
+    const names: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      names.push(this.download);
+    });
+    return names;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('suggests a new name after the document was annotated in the viewer', async () => {
+    // Annotating never passes through this app, so nothing has renamed the
+    // document — but the file on disk is still the unannotated one.
+    registry = registryWithViewerEdits(true);
+    const names = captureSavedNames();
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('save').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('save'));
+
+    await waitFor(() => expect(names).toEqual(['report-edited.pdf']));
+  });
+
+  it('offers the original name when nothing has been changed at all', async () => {
+    registry = registryWithViewerEdits(false);
+    const names = captureSavedNames();
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('save').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('save'));
+
+    await waitFor(() => expect(names).toEqual(['report.pdf']));
+  });
+
+  it('does not demote a document that already says what was done to it', async () => {
+    // A reduction that is then highlighted is still a reduction; "-edited"
+    // would say less about it than the name it already has.
+    vi.mocked(compressPdf).mockResolvedValue({
+      pdf: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]),
+      originalSize: 8 * 1024 * 1024,
+      newSize: 2 * 1024 * 1024,
+      imagesFound: 4,
+      imagesDownsampled: 4,
+      changed: true,
+    });
+    registry = registryWithViewerEdits(true);
+    const names = captureSavedNames();
+    // Reducing remounts the viewer, and the viewer is remounted by its blob URL
+    // changing. The shared stub hands back the same URL every time, so without
+    // this the viewer never re-readies and Save stays disabled.
+    let issued = 0;
+    URL.createObjectURL = vi.fn(() => `blob:stub-${String((issued += 1))}`);
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-reduce').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-reduce'));
+    fireEvent.click(await screen.findByTestId('reduce-confirm'));
+    await screen.findByTestId('reduce-summary');
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('save').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('save'));
+
+    await waitFor(() => expect(names).toEqual(['report-reduced.pdf']));
+  });
+});

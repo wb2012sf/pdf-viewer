@@ -103,8 +103,8 @@ test.describe('unsaved changes', () => {
 
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     await expect(page.getByTestId('confirm-message')).toContainText('not been written to a file');
-    // Still open behind the dialog.
-    await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
+    // Still open behind the dialog, under the name the rotation gave it.
+    await expect(page.getByTestId('open-filename')).toHaveText('sample-edited.pdf');
   });
 
   test('cancelling the warning leaves the document exactly where it was', async ({ page }) => {
@@ -115,7 +115,7 @@ test.describe('unsaved changes', () => {
     await page.getByTestId('confirm-cancel').click();
 
     await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
-    await expect(page.getByTestId('open-filename')).toHaveText('sample.pdf');
+    await expect(page.getByTestId('open-filename')).toHaveText('sample-edited.pdf');
     // And the change is still there, not quietly rolled back.
     await expect(page.getByTestId('page-0-rotation')).toHaveText('+90°');
   });
@@ -141,7 +141,9 @@ test.describe('unsaved changes', () => {
       page.getByTestId('confirm-save').click(),
     ]);
 
-    expect(download.suggestedFilename()).toBe('sample.pdf');
+    // A rotated document is not the document that was opened, and saving from
+    // the warning must not offer to write it over the file it came from.
+    expect(download.suggestedFilename()).toBe('sample-edited.pdf');
     await expect(page.getByTestId('empty-state')).toBeVisible({ timeout: 30_000 });
   });
 

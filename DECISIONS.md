@@ -372,3 +372,18 @@ One line per assumption made instead of interrupting a session, newest last.
   overwrites a file whose high-resolution images cannot be recovered. This is the rule merge already
   follows (`merged.pdf`, 2026-09-01) and extract and split already follow (`-pages.pdf`, `-part-N.pdf`):
   a derived document gets a derived name. Reducing twice does not stack the suffix.
+- 2026-09-22 — **Every operation that changes a document now renames it**, not just size reduction:
+  `-edited` for rotate/delete/reorder/append and for annotating in the viewer, `-searchable` for OCR,
+  `-reduced` for size reduction, on top of the `-pages`/`-part-N`/`merged.pdf` that extract, split and
+  merge already used. Supersedes the reduce-only rename recorded earlier the same day. The file on disk is
+  still the original after any of these, so offering its name back in the Save dialog is what talks someone
+  into overwriting it — and a rotation is recoverable where a reduction or a deleted page is not, which is
+  a distinction not worth asking the user to hold in their head at the moment they are clicking Save.
+- 2026-09-22 — Markers **replace rather than stack**, and only a marker ending the name counts as one of
+  ours. Three operations in a row would otherwise give `report-edited-reduced-searchable.pdf`, and a
+  document the user themselves called `reduced-staff-list.pdf` would have their word eaten. The name only
+  has to be different and recognisable; it is not a changelog.
+- 2026-09-22 — Annotating is renamed **at save time rather than when it happens**. Highlights, stamps and
+  form values live in the viewer's own state; this app is never told, and nothing re-renders — the same
+  reason `hasUnsavedChanges` is asked at the moment it is needed rather than computed during render. A
+  document already carrying a more specific marker is not demoted to `-edited` by a highlight.

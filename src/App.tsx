@@ -8,7 +8,7 @@ import { MergeDialog } from './components/MergeDialog';
 import { OcrControls } from './components/OcrControls';
 import { PagePanel } from './components/PagePanel';
 import { ReduceSizeDialog } from './components/ReduceSizeDialog';
-import { reducedFileName, reductionSummary, type SizePreset } from './components/reduce-size-presets';
+import { reductionSummary, type SizePreset } from './components/reduce-size-presets';
 import { useOcr } from './hooks/useOcr';
 import { usePageOps, type PageOperation } from './hooks/usePageOps';
 import { useThumbnails } from './hooks/useThumbnails';
@@ -25,6 +25,7 @@ import {
   rotatePages,
 } from './lib/pdf/page-ops';
 import { compressPdf } from './lib/pdf/compress';
+import { derivedName, hasChangeMarker } from './lib/pdf/derived-name';
 import { resampleImage } from './lib/pdf/image-resampler';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
@@ -242,7 +243,7 @@ export function App(): React.JSX.Element {
 
     // Reopen the viewer on the result so the new text layer is searchable at
     // once, rather than making the user save the file and open it again.
-    replaceDocument(openDocumentFrom(document.name, searchable), true);
+    replaceDocument(openDocumentFrom(derivedName(document.name, 'searchable'), searchable), true);
   }, [registry, engine, document, runOcr, replaceDocument]);
 
   const { apply: applyPageOp } = pageOps;
@@ -254,7 +255,7 @@ export function App(): React.JSX.Element {
 
       const next = await applyPageOp(registry, operation);
       if (!next) return;
-      replaceDocument(openDocumentFrom(document.name, next), true);
+      replaceDocument(openDocumentFrom(derivedName(document.name, 'edited'), next), true);
     },
     [registry, document, applyPageOp, replaceDocument],
   );
@@ -398,7 +399,7 @@ export function App(): React.JSX.Element {
         // and handing it back under the original's name pre-fills the Save
         // dialog with that name. One click through it and the original is gone.
         if (report.changed) {
-          replaceDocument(openDocumentFrom(reducedFileName(document.name), report.pdf), true);
+          replaceDocument(openDocumentFrom(derivedName(document.name, 'reduced'), report.pdf), true);
         }
         // After `replaceDocument`, which clears the summary of the *previous*
         // document: this one describes the document that just replaced it.
@@ -468,8 +469,18 @@ export function App(): React.JSX.Element {
       return 'failed';
     }
 
+    // Highlighting, stamping and filling a form happen entirely inside the
+    // viewer: no new document is built, so nothing has renamed this one. Derive
+    // the suggestion here instead, and only while the name is still the one the
+    // file was opened under — a document already marked `-reduced` should not
+    // be demoted to `-edited` by a highlight.
+    const suggested =
+      !hasChangeMarker(document.name) && viewerHasUnsavedChanges(registry)
+        ? derivedName(document.name, 'edited')
+        : document.name;
+
     try {
-      const outcome = await saveFile(bytes, document.name);
+      const outcome = await saveFile(bytes, suggested);
       // A dismissed save dialog wrote nothing, so the work is still unsaved.
       if (outcome === 'saved') setEditedSinceSave(false);
       return outcome;

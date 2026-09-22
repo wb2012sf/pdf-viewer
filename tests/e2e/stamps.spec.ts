@@ -154,7 +154,7 @@ test.describe('rubber stamps', () => {
     expect(await annotationSubtypes(saved, 0)).toContain('/Stamp');
   });
 
-  test('saves the file under the name it was opened with', async ({ page }) => {
+  test('offers a new name once a stamp has been placed on it', async ({ page }) => {
     await openSample(page);
     await placeFirstStamp(page);
 
@@ -163,6 +163,8 @@ test.describe('rubber stamps', () => {
       page.getByTestId('save').click(),
     ]);
 
-    expect(download.suggestedFilename()).toBe('sample.pdf');
+    // The file on disk is the unstamped one. Offering its name back is how a
+    // save dialog talks someone into overwriting it.
+    expect(download.suggestedFilename()).toBe('sample-edited.pdf');
   });
 });

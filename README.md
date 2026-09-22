@@ -137,9 +137,7 @@ What it will and will not touch:
   original, the original is what you keep, and the toolbar says so.
 
 Nothing is written to disk until **Save**, as with every other operation here, so a result you do not like
-costs a Close rather than a lost file. A document that *was* reduced is renamed `<name>-reduced.pdf`, so the
-Save dialog cannot offer to write it over the original — the discarded resolution is not recoverable. A
-document that was left unchanged keeps its name, having nothing to be protected from.
+costs a Close rather than a lost file. A reduced document is also renamed — see [Saving](#saving) below.
 
 ## OCR
 
@@ -159,6 +157,36 @@ Open a PDF, press **Make searchable**, and the viewer reopens on the result once
 Nothing is fetched at runtime: the Tesseract worker and WASM core are bundled through Vite, and
 `eng.traineddata` is served from `public/`. Adding a language means adding its `.traineddata` to
 `public/tessdata/`.
+
+## Saving
+
+Nothing is written to disk until **Save as…**, and **a document this app has changed is never offered back
+under the name it was opened with**. The file on disk is still the original; a Save dialog pre-filled with
+its name is an invitation to overwrite it, and several of these changes cannot be undone from the result —
+a reduction has thrown the resolution away, a deleted page is simply not in the bytes any more.
+
+| What you did                              | Saved as                |
+| ----------------------------------------- | ----------------------- |
+| Rotate, delete, reorder, append, annotate | `<name>-edited.pdf`     |
+| Make searchable (OCR)                     | `<name>-searchable.pdf` |
+| Reduce size                               | `<name>-reduced.pdf`    |
+| Extract pages                             | `<name>-pages.pdf`      |
+| Split                                     | `<name>-part-N.pdf`     |
+| Merge…                                    | `merged.pdf`            |
+| Nothing                                   | unchanged               |
+
+Markers replace rather than accumulate: rotating a page, reducing the result and then running OCR gives
+`report-searchable.pdf`, not `report-edited-reduced-searchable.pdf`. Only a marker at the very end of the
+name counts as one of ours, so a file you called `reduced-staff-list.pdf` keeps the word you chose. The
+toolbar shows the new name the moment an operation finishes, so there is no surprise at the Save dialog.
+
+Annotating is the one case where nothing is renamed up front: highlights, stamps and form values live
+inside the viewer and never pass through this app, so the new name is worked out when you press Save. A
+document that already carries a more specific marker is left alone — a reduction you then highlighted is
+still a reduction, and `-edited` would say less about it.
+
+To overwrite the original deliberately, type its name back into the Save dialog. It is one deliberate act
+rather than the default.
 
 ## Staying offline
 

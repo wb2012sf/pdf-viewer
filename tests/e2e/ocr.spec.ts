@@ -92,9 +92,10 @@ test.describe('OCR', () => {
     await page.getByTestId('ocr-run').click();
     await expect(page.getByTestId('ocr-done')).toBeVisible({ timeout: OCR_TIMEOUT });
 
-    // The viewer is reopened on the new bytes; the scan must still be rendered
-    // and the filename unchanged.
-    await expect(page.getByTestId('open-filename')).toHaveText('scanned.pdf');
+    // The viewer is reopened on the new bytes, so the scan must still be
+    // rendered — under the name of what it now is, since the searchable copy is
+    // not the file that was opened.
+    await expect(page.getByTestId('open-filename')).toHaveText('scanned-searchable.pdf');
     await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
   });
 });
