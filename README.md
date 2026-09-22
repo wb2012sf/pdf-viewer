@@ -111,9 +111,18 @@ them queued, so the order can be checked before anything is assembled.
 
 The size of the open document is shown beside its name in the toolbar, from the moment it is opened and
 after every operation. "Is this file big?" is the question that sends anyone looking for Reduce size, and it
-should not take running the reduction to answer it. One caveat: annotations live inside the viewer and never
-reach the bytes this app holds, so highlighting does not move that figure until the document is next
-rewritten.
+should not take running the reduction to answer it.
+
+That figure is the size of the bytes this app holds, which costs nothing to show but is blind to
+annotating: highlights, stamps and form values live inside the viewer and never reach those bytes.
+**Click the size to measure what saving right now would actually write**, annotations included. A measured
+figure is marked with an asterisk, and the mark clears as soon as an operation replaces the document.
+
+Measuring has the viewer serialise the whole document, which takes about a second on a large file — fine on
+a press, far too slow to do on every render, which is why it is a button rather than the default. Expect the
+measured figure to differ from the file on disk even when nothing has been annotated: the viewer writes its
+own PDF rather than handing back the bytes it was given. It answers "how big would this be if I saved it
+now", not "how big is the file I opened".
 
 **Reduce size…** in the toolbar makes a file smaller by lowering the resolution of the images inside it —
 the same job as Preview's "Reduce File Size". Text, vector drawings and page structure are untouched; only

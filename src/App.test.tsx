@@ -429,3 +429,84 @@ describe('showing how big the open document is', () => {
     await waitFor(() => expect(screen.getByTestId('open-filesize').textContent).toBe('6 B'));
   });
 });
+
+describe('measuring the size on request', () => {
+  it('asks the viewer what saving now would write', async () => {
+    // The document was opened as 5 bytes; the viewer would write 2. The point
+    // of the button is that those are different numbers.
+    registry = registryWith(workingExporter);
+    render(<App />);
+    await openAFile();
+    expect(screen.getByTestId('open-filesize').textContent).toContain('5 B');
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-filesize').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-filesize'));
+
+    await waitFor(() => expect(screen.getByTestId('open-filesize').textContent).toContain('2 B'));
+  });
+
+  it('marks a measured figure as measured, so it is not mistaken for the other one', async () => {
+    registry = registryWith(workingExporter);
+    render(<App />);
+    await openAFile();
+    expect(screen.queryByLabelText('measured')).toBeNull();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-filesize').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-filesize'));
+
+    await waitFor(() => expect(screen.getByLabelText('measured')).toBeTruthy());
+  });
+
+  it('reports a failure rather than showing a number that is wrong', async () => {
+    // No export component: the same failure Save hits, down the same channel.
+    registry = registryWith(null);
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-filesize').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-filesize'));
+
+    expect((await screen.findByTestId('save-error')).textContent).toMatch(
+      /Could not read the document back from the viewer/,
+    );
+    // Still the figure it had, not a guess.
+    expect(screen.getByTestId('open-filesize').textContent).toContain('5 B');
+  });
+
+  it('cannot be measured before the viewer is ready', async () => {
+    registry = null;
+    render(<App />);
+    await openAFile();
+
+    expect(screen.getByTestId<HTMLButtonElement>('open-filesize').disabled).toBe(true);
+  });
+
+  it('drops the measurement when an operation replaces the document', async () => {
+    // A measurement describes the document it was taken from. Carrying it over
+    // would label the new document with the old one's size.
+    vi.mocked(compressPdf).mockResolvedValue({
+      pdf: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]),
+      originalSize: 5,
+      newSize: 6,
+      imagesFound: 1,
+      imagesDownsampled: 1,
+      changed: true,
+    });
+    registry = registryWith(workingExporter);
+    let issued = 0;
+    URL.createObjectURL = vi.fn(() => `blob:stub-${String((issued += 1))}`);
+    render(<App />);
+    await openAFile();
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-filesize').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-filesize'));
+    await waitFor(() => expect(screen.getByLabelText('measured')).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId('open-reduce'));
+    fireEvent.click(await screen.findByTestId('reduce-confirm'));
+    await screen.findByTestId('reduce-summary');
+
+    await waitFor(() => expect(screen.getByTestId('open-filesize').textContent).toContain('6 B'));
+    expect(screen.queryByLabelText('measured')).toBeNull();
+  });
+});

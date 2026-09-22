@@ -400,3 +400,17 @@ One line per assumption made instead of interrupting a session, newest last.
   document started, which is gone the moment the reduction lands.
 - 2026-09-22 — The filename truncates before the size does when the toolbar runs out of room. A size cut to
   "3…" says nothing at all, while a name cut to "photo-redu…" still identifies the document.
+- 2026-09-22 — The size chip in the toolbar **is** the measure button, rather than gaining a control beside
+  it. The bar already carries the filename, the size, a reduction summary and six buttons, and the thing
+  being re-measured is the thing already being looked at. Cost: a size chip reads as a label, so it is given
+  a hover border and a tooltip to say it can be pressed.
+- 2026-09-22 — A measured figure is marked with an asterisk rather than silently replacing the one shown by
+  default, because the two are not the same quantity. `currentDocumentBytes` has PDFium serialise its own
+  PDF, so even an untouched document measures differently from the file it was opened from — `sample.pdf`
+  is 1.2 KB on disk and measures ~6 KB with one stamp on it. Presenting that as a correction to the default
+  figure would look like a bug; presenting it as "what saving now would write" is what it actually is.
+- 2026-09-22 — A measurement is discarded whenever the document is replaced. It describes the document it
+  was taken from, and carrying it across an operation would label the new document with the old one's size.
+- 2026-09-22 — A failed measurement reports the error and leaves the previous figure standing, down the same
+  channel a failed save uses — it is the same failure (the viewer's export component being unavailable), and
+  a number that is quietly wrong is worse than no new number.

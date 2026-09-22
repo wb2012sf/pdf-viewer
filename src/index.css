@@ -85,12 +85,35 @@ body {
 .workbench__filesize {
   flex: none;
   padding: 0.0625rem 0.375rem;
+  border: 1px solid transparent;
   border-radius: 0.25rem;
   background: var(--workbench-bg);
   color: var(--workbench-muted);
   font-size: 0.75rem;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.workbench__filesize:hover:not(:disabled) {
+  border-color: var(--workbench-border);
+  color: var(--workbench-fg);
+}
+
+.workbench__filesize:focus-visible {
+  outline: 2px solid var(--workbench-accent);
+  outline-offset: 1px;
+}
+
+.workbench__filesize:disabled {
+  cursor: default;
+}
+
+/* Marks a figure that was measured rather than inferred from the bytes held. */
+.workbench__filesize-mark {
+  margin-left: 0.125rem;
+  color: var(--workbench-accent);
 }
 
 /* Visually hidden but still focusable, so the styled <label> drives it. */

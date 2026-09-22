@@ -168,3 +168,35 @@ test.describe('rubber stamps', () => {
     expect(download.suggestedFilename()).toBe('sample-edited.pdf');
   });
 });
+
+test.describe('measuring the size of an annotated document', () => {
+  /** The number in the size chip, whatever unit it is showing. */
+  async function measuredBytes(page: Page): Promise<number> {
+    await page.getByTestId('open-filesize').click();
+    await expect(page.getByLabel('measured')).toBeVisible({ timeout: 30_000 });
+    const text = (await page.getByTestId('open-filesize').textContent()) ?? '';
+
+    const [, value, unit] = /([\d.]+)\s*(B|KB|MB)/.exec(text) ?? [];
+    expect(value, `expected a size in "${text}"`).toBeDefined();
+    const scale = { B: 1, KB: 1024, MB: 1024 * 1024 }[unit ?? 'B'] ?? 1;
+    return Number(value) * scale;
+  }
+
+  test('counts a stamp that the figure shown by default cannot see', async ({ page }) => {
+    await openSample(page);
+
+    // Measured before and after, rather than measured against the figure shown
+    // by default: the viewer writes its own PDF, so those two are not the same
+    // quantity even on an untouched document.
+    const before = await measuredBytes(page);
+
+    await placeFirstStamp(page);
+    const after = await measuredBytes(page);
+
+    // A stamp is artwork embedded in the file; it cannot be free.
+    expect(after).toBeGreaterThan(before);
+
+    // Reviewed for how the measured figure reads beside the filename.
+    await page.screenshot({ path: 'test-results/screenshots/measured-size.png', fullPage: true });
+  });
+});

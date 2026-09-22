@@ -81,6 +81,12 @@ export function App(): React.JSX.Element {
   const mergeQueue = useMergeQueue();
   const [mergeOpen, setMergeOpen] = useState(false);
   const [merging, setMerging] = useState(false);
+  /**
+   * Size measured on request, which counts annotations the bytes below do not.
+   * Null until asked for, and again whenever the document is replaced.
+   */
+  const [measuredSize, setMeasuredSize] = useState<number | null>(null);
+  const [measuring, setMeasuring] = useState(false);
   const [reduceOpen, setReduceOpen] = useState(false);
   const [reducing, setReducing] = useState(false);
   const [reduceProgress, setReduceProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -121,6 +127,8 @@ export function App(): React.JSX.Element {
     setRegistry(null);
     setSaveError(null);
     setReduceSummary(null);
+    // A measurement describes the document it was taken from, not this one.
+    setMeasuredSize(null);
     // Page indices from the old document mean nothing in the new one.
     setSelected(new Set());
     setEditedSinceSave(edited);
@@ -456,6 +464,36 @@ export function App(): React.JSX.Element {
     if (alsoAdd && alsoAdd.length > 0) await mergeQueue.addFiles(alsoAdd);
   }, [registry, document, mergeQueue]);
 
+  /**
+   * Measures what saving right now would actually write.
+   *
+   * The figure shown by default is the size of the bytes this app holds, which
+   * is free but blind to annotating: highlights, stamps and form values live in
+   * the viewer and never reach those bytes. Reading the real thing means having
+   * the viewer serialise the whole document, which is far too slow to do on
+   * every render but perfectly reasonable on a press.
+   *
+   * Note that this is not the size of the file on disk even when nothing has
+   * been annotated — the viewer writes its own PDF rather than handing back the
+   * bytes it was given — which is why it is offered as "what saving now would
+   * write" rather than as a correction to the figure beside it.
+   */
+  const handleMeasureSize = useCallback(async () => {
+    if (!registry) return;
+
+    setMeasuring(true);
+    setSaveError(null);
+    try {
+      setMeasuredSize((await currentDocumentBytes(registry)).byteLength);
+    } catch (cause) {
+      // The same failure a save hits, reported down the same channel: better an
+      // error than a number that is quietly wrong.
+      setSaveError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setMeasuring(false);
+    }
+  }, [registry]);
+
   const handleSave = useCallback(async (): Promise<SaveResult> => {
     if (!document || !registry) return 'failed';
     setSaveError(null);
@@ -582,16 +620,28 @@ export function App(): React.JSX.Element {
             {document?.name ?? 'No document open'}
           </span>
           {document && (
-            <span
+            <button
+              type="button"
               className="workbench__filesize"
               data-testid="open-filesize"
-              // The bytes this app holds. Annotating happens inside the viewer
-              // and never reaches them, so a highlight does not move this
-              // figure until the document is next rewritten.
-              title="Size of the document as it stands. Annotations added since are not counted yet."
+              onClick={() => void handleMeasureSize()}
+              disabled={registry === null || measuring}
+              // The chip is the button: the toolbar has no room for a separate
+              // control, and the thing you want to re-measure is the thing you
+              // are already looking at.
+              title={
+                measuredSize === null
+                  ? 'Size of the document as it stands. Click to measure what saving now would write, annotations included.'
+                  : 'Measured: what saving now would write, annotations included. Click to measure again.'
+              }
             >
-              {formatSize(document.bytes.byteLength)}
-            </span>
+              {measuring ? '…' : formatSize(measuredSize ?? document.bytes.byteLength)}
+              {measuredSize !== null && !measuring && (
+                <span className="workbench__filesize-mark" aria-label="measured">
+                  *
+                </span>
+              )}
+            </button>
           )}
         </span>
 
