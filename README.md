@@ -109,6 +109,12 @@ them queued, so the order can be checked before anything is assembled.
 
 ## Reducing file size
 
+The size of the open document is shown beside its name in the toolbar, from the moment it is opened and
+after every operation. "Is this file big?" is the question that sends anyone looking for Reduce size, and it
+should not take running the reduction to answer it. One caveat: annotations live inside the viewer and never
+reach the bytes this app holds, so highlighting does not move that figure until the document is next
+rewritten.
+
 **Reduce size…** in the toolbar makes a file smaller by lowering the resolution of the images inside it —
 the same job as Preview's "Reduce File Size". Text, vector drawings and page structure are untouched; only
 image streams are rewritten, so a document stays searchable, selectable and the same shape.

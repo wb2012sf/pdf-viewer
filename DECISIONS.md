@@ -387,3 +387,16 @@ One line per assumption made instead of interrupting a session, newest last.
   form values live in the viewer's own state; this app is never told, and nothing re-renders — the same
   reason `hasUnsavedChanges` is asked at the moment it is needed rather than computed during render. A
   document already carrying a more specific marker is not demoted to `-edited` by a highlight.
+- 2026-09-22 — The open document's size is shown in the toolbar at all times, taken from the bytes this app
+  holds (`document.bytes.byteLength`) rather than asked of the viewer. Reading the true current size means
+  exporting the whole PDF through PDFium, which is far too expensive to do on every render. The figure is
+  therefore exact on open and after every operation this app performs, and stale only by whatever annotating
+  has added since — a tooltip says so. Updating it on save was considered and rejected: refreshing
+  `document.bytes` changes the document identity, which trips the effect that revokes the object URL the
+  viewer is currently reading from.
+- 2026-09-22 — With the size on screen at all times, the reduction summary stopped repeating it:
+  "190 KB → 30 KB (84% smaller)" became "was 190 KB (84% smaller)", and the unchanged case dropped its size
+  entirely. The new figure is already beside the filename; what the summary alone can say is where the
+  document started, which is gone the moment the reduction lands.
+- 2026-09-22 — The filename truncates before the size does when the toolbar runs out of room. A size cut to
+  "3…" says nothing at all, while a name cut to "photo-redu…" still identifies the document.

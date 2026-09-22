@@ -215,7 +215,7 @@ describe('reducing the file size', () => {
     // The summary has to survive the viewer being reopened on the result —
     // which clears the summary belonging to the document it replaced.
     const summary = await screen.findByTestId('reduce-summary');
-    expect(summary.textContent).toContain('8.0 MB → 2.0 MB');
+    expect(summary.textContent).toContain('was 8.0 MB');
     expect(screen.queryByTestId('reduce-dialog')).toBeNull();
 
     expect(vi.mocked(compressPdf)).toHaveBeenCalledWith(
@@ -384,5 +384,48 @@ describe('naming a document this app has changed', () => {
     fireEvent.click(screen.getByTestId('save'));
 
     await waitFor(() => expect(names).toEqual(['report-reduced.pdf']));
+  });
+});
+
+describe('showing how big the open document is', () => {
+  it('shows the size as soon as a document is open, before anything is done to it', async () => {
+    // The question "is this file big?" is what sends someone looking for
+    // Reduce size; answering it should not require running it first.
+    registry = registryWith(workingExporter);
+    render(<App />);
+    await openAFile();
+
+    // The fixture is the five bytes of a %PDF- header.
+    expect(screen.getByTestId('open-filesize').textContent).toBe('5 B');
+  });
+
+  it('shows nothing to size when no document is open', () => {
+    registry = null;
+    render(<App />);
+
+    expect(screen.queryByTestId('open-filesize')).toBeNull();
+  });
+
+  it('follows the document as an operation changes it', async () => {
+    vi.mocked(compressPdf).mockResolvedValue({
+      // Six bytes out, five in: the figure has to come from the new document.
+      pdf: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]),
+      originalSize: 5,
+      newSize: 6,
+      imagesFound: 1,
+      imagesDownsampled: 1,
+      changed: true,
+    });
+    registry = registryWith(workingExporter);
+    render(<App />);
+    await openAFile();
+    expect(screen.getByTestId('open-filesize').textContent).toBe('5 B');
+
+    await waitFor(() => expect(screen.getByTestId<HTMLButtonElement>('open-reduce').disabled).toBe(false));
+    fireEvent.click(screen.getByTestId('open-reduce'));
+    fireEvent.click(await screen.findByTestId('reduce-confirm'));
+
+    await screen.findByTestId('reduce-summary');
+    await waitFor(() => expect(screen.getByTestId('open-filesize').textContent).toBe('6 B'));
   });
 });

@@ -59,16 +59,38 @@ body {
   font-weight: 600;
 }
 
-.workbench__filename {
+.workbench__document {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
   flex: 1;
   /* Not 0: a status message sharing the bar would otherwise shrink the
      document's name away to "p…", which identifies nothing. */
   min-width: 6rem;
   overflow: hidden;
+}
+
+.workbench__filename {
+  /* The name gives way before the size does — the size is four characters and
+     unreadable truncated, the name still says something at half length. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--workbench-muted);
   font-size: 0.875rem;
+}
+
+.workbench__filesize {
+  flex: none;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
+  background: var(--workbench-bg);
+  color: var(--workbench-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Visually hidden but still focusable, so the styled <label> drives it. */

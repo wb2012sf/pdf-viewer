@@ -1,4 +1,5 @@
 import { DEFAULT_JPEG_QUALITY, DEFAULT_TARGET_DPI, type CompressionReport } from '../lib/pdf/compress';
+import { formatSize } from '../lib/format';
 
 /**
  * The resolutions offered for size reduction, and the words used to report what
@@ -49,19 +50,6 @@ export const SIZE_PRESETS: readonly SizePreset[] = [
 
 export const DEFAULT_PRESET_ID = 'balanced';
 
-/** A byte count as a person would write it. */
-export function formatSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '—';
-  if (bytes < 1024) return `${String(Math.round(bytes))} B`;
-
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${String(Math.round(kb))} KB`;
-
-  const mb = kb / 1024;
-  // One decimal below 100 MB, none above it: "4.2 MB" is useful, "418.3 MB" is noise.
-  return mb < 100 ? `${mb.toFixed(1)} MB` : `${String(Math.round(mb))} MB`;
-}
-
 /**
  * What a finished run should say in the toolbar.
  *
@@ -69,17 +57,17 @@ export function formatSize(bytes: number): string {
  * quietly did nothing, on a file the user can see is still 40 MB, reads as a
  * broken feature rather than as a file that was already small.
  *
- * Kept to a few words: this shares one toolbar row with the document's name and
- * six buttons, and a sentence long enough to be comfortable squeezes all of
- * them. The images it touched are not named here — the percentage already says
- * whether anything happened.
+ * Says only what the size shown beside the filename cannot. That figure is the
+ * document's size now, so repeating it here would spend half of a crowded
+ * toolbar row saying the same thing twice; what it cannot say is where the
+ * document started, which is gone the moment the reduction lands.
  */
 export function reductionSummary(report: CompressionReport): string {
   if (!report.changed) {
     if (report.imagesFound === 0) return 'No images to reduce';
-    return `No further reduction — still ${formatSize(report.originalSize)}`;
+    return 'No further reduction at this resolution';
   }
 
   const saved = Math.round((1 - report.newSize / report.originalSize) * 100);
-  return `${formatSize(report.originalSize)} → ${formatSize(report.newSize)} (${String(saved)}% smaller)`;
+  return `was ${formatSize(report.originalSize)} (${String(saved)}% smaller)`;
 }

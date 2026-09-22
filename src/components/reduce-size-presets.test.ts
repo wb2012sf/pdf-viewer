@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatSize, reductionSummary } from './reduce-size-presets';
+import { reductionSummary } from './reduce-size-presets';
 import type { CompressionReport } from '../lib/pdf/compress';
 
 /** A plausible report; the compression itself is covered in lib/pdf. */
@@ -15,21 +15,9 @@ function report(overrides: Partial<CompressionReport> = {}): CompressionReport {
   };
 }
 
-describe('formatSize', () => {
-  it.each([
-    [0, '0 B'],
-    [512, '512 B'],
-    [2048, '2 KB'],
-    [4.2 * 1024 * 1024, '4.2 MB'],
-    [418.3 * 1024 * 1024, '418 MB'],
-  ])('writes %s bytes as %s', (bytes, expected) => {
-    expect(formatSize(bytes)).toBe(expected);
-  });
-});
-
 describe('reductionSummary', () => {
-  it('reports what was saved', () => {
-    expect(reductionSummary(report())).toBe('4.0 MB → 1.0 MB (75% smaller)');
+  it('reports where the document started, which is what the size beside it cannot', () => {
+    expect(reductionSummary(report())).toBe('was 4.0 MB (75% smaller)');
   });
 
   it('says plainly when a document has no images to reduce', () => {
@@ -39,10 +27,9 @@ describe('reductionSummary', () => {
   });
 
   it('says plainly when the images were already small enough', () => {
-    const summary = reductionSummary(report({ changed: false, imagesDownsampled: 0 }));
-
-    expect(summary).toContain('No further reduction');
-    // The size it stayed at, so "nothing happened" is still an answer about a file.
-    expect(summary).toContain('4.0 MB');
+    // The size it stayed at is already on screen beside the filename.
+    expect(reductionSummary(report({ changed: false, imagesDownsampled: 0 }))).toBe(
+      'No further reduction at this resolution',
+    );
   });
 });

@@ -24,6 +24,7 @@ import {
   splitPointsToRanges,
   rotatePages,
 } from './lib/pdf/page-ops';
+import { formatSize } from './lib/format';
 import { compressPdf } from './lib/pdf/compress';
 import { derivedName, hasChangeMarker } from './lib/pdf/derived-name';
 import { resampleImage } from './lib/pdf/image-resampler';
@@ -576,8 +577,22 @@ export function App(): React.JSX.Element {
     <div className="workbench">
       <header className="workbench__bar">
         <span className="workbench__title">PDF Workbench</span>
-        <span className="workbench__filename" data-testid="open-filename">
-          {document?.name ?? 'No document open'}
+        <span className="workbench__document">
+          <span className="workbench__filename" data-testid="open-filename">
+            {document?.name ?? 'No document open'}
+          </span>
+          {document && (
+            <span
+              className="workbench__filesize"
+              data-testid="open-filesize"
+              // The bytes this app holds. Annotating happens inside the viewer
+              // and never reaches them, so a highlight does not move this
+              // figure until the document is next rewritten.
+              title="Size of the document as it stands. Annotations added since are not counted yet."
+            >
+              {formatSize(document.bytes.byteLength)}
+            </span>
+          )}
         </span>
 
         {document && (

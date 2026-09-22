@@ -68,8 +68,8 @@ test.describe('reducing the file size', () => {
 
     const summary = page.getByTestId('reduce-summary');
     await expect(summary).toBeVisible({ timeout: 60_000 });
-    // "190 KB → 30 KB (84% smaller)" — the arrow is the reduction.
-    await expect(summary).toContainText('→');
+    // "was 190 KB (84% smaller)" — the size it is *now* sits beside the filename.
+    await expect(summary).toContainText('was');
     await expect(summary).toContainText('smaller');
 
     // The viewer is showing the reduced document, not a blank frame where one
@@ -118,5 +118,24 @@ test.describe('reducing the file size', () => {
     // Nothing was thrown away, so there is nothing to rename away from.
     expect(after.filename).toBe('photo.pdf');
     expect(originalSize).toBeGreaterThan(0);
+  });
+});
+
+test.describe('the size of the open document', () => {
+  test('is shown from the moment it opens, not only after a reduction', async ({ page }) => {
+    await open(page, PHOTO_PDF);
+
+    // The fixture on disk is ~190 KB.
+    await expect(page.getByTestId('open-filesize')).toHaveText(/^\d+ KB$/);
+
+    await page.getByTestId('open-reduce').click();
+    await page.getByTestId('reduce-preset-screen').click();
+    await page.getByTestId('reduce-confirm').click();
+    await expect(page.getByTestId('reduce-summary')).toBeVisible({ timeout: 60_000 });
+
+    // And it follows the document it is describing.
+    await expect(page.getByTestId('open-filesize')).toHaveText(/^\d+ KB$/);
+    const reduced = Number(/(\d+)/.exec((await page.getByTestId('open-filesize').textContent()) ?? '')?.[1]);
+    expect(reduced).toBeLessThan(100);
   });
 });
