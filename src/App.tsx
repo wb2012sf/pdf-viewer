@@ -31,7 +31,7 @@ import { resampleImage } from './lib/pdf/image-resampler';
 import { offlineViewerConfig } from './lib/viewer/offline-config';
 import { currentDocumentBytes } from './lib/viewer/current-document';
 import { saveFile } from './lib/platform/save-file';
-import { viewerHasUnsavedChanges } from './lib/viewer/unsaved-changes';
+import { trackViewerChanges, type ViewerChangeTracker } from './lib/viewer/unsaved-changes';
 import { bridgeViewerExport } from './lib/viewer/export-bridge';
 import { overrideDocumentCommands, type DocumentCommandHandlers } from './lib/viewer/document-commands';
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
@@ -68,9 +68,15 @@ export function App(): React.JSX.Element {
   /**
    * Edits this app made (OCR, page operations) since the last save. Edits made
    * *inside* the viewer are tracked by the viewer itself and asked for
-   * separately — see `viewerHasUnsavedChanges`.
+   * separately — see `viewerChanges`.
    */
   const [editedSinceSave, setEditedSinceSave] = useState(false);
+  /**
+   * Edits made inside the viewer since the last save. A ref, not state: the
+   * viewer never tells this app about them, so the question is asked at the
+   * moment it matters rather than answered during render.
+   */
+  const viewerChanges = useRef<ViewerChangeTracker | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [rotations, setRotations] = useState<number[]>([]);
   /** How far each page has been turned since the document was opened. */
@@ -151,6 +157,18 @@ export function App(): React.JSX.Element {
       onOpen: () => documentCommands.current.onOpen(),
       onClose: () => documentCommands.current.onClose(),
     });
+  }, [registry]);
+
+  // Each viewer (one per document) has its own history, so each gets its own
+  // tracker, and a new document starts with nothing saved and nothing edited.
+  useEffect(() => {
+    if (!registry) return;
+    const tracker = trackViewerChanges(registry);
+    viewerChanges.current = tracker;
+    return () => {
+      tracker.stop();
+      if (viewerChanges.current === tracker) viewerChanges.current = null;
+    };
   }, [registry]);
 
   // The viewer's Thumbnails tab looks like the Pages panel but only navigates;
@@ -514,6 +532,11 @@ export function App(): React.JSX.Element {
     if (!document || !registry) return 'failed';
     setSaveError(null);
 
+    // Taken before the read: an edit made while the save dialog is open is not
+    // in these bytes, so it must still count as unsaved afterwards.
+    const tracker = viewerChanges.current;
+    const checkpoint = tracker?.checkpoint();
+
     let bytes: Uint8Array;
     try {
       bytes = await currentDocumentBytes(registry);
@@ -530,14 +553,17 @@ export function App(): React.JSX.Element {
     // file was opened under — a document already marked `-reduced` should not
     // be demoted to `-edited` by a highlight.
     const suggested =
-      !hasChangeMarker(document.name) && viewerHasUnsavedChanges(registry)
+      !hasChangeMarker(document.name) && (tracker?.hasUnsavedChanges() ?? false)
         ? derivedName(document.name, 'edited')
         : document.name;
 
     try {
       const outcome = await saveFile(bytes, suggested);
       // A dismissed save dialog wrote nothing, so the work is still unsaved.
-      if (outcome === 'saved') setEditedSinceSave(false);
+      if (outcome === 'saved') {
+        setEditedSinceSave(false);
+        if (tracker && checkpoint !== undefined) tracker.markSaved(checkpoint);
+      }
       return outcome;
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : String(cause));
@@ -555,8 +581,8 @@ export function App(): React.JSX.Element {
    * long after the document stopped being clean.
    */
   const hasUnsavedChanges = useCallback(
-    (): boolean => editedSinceSave || viewerHasUnsavedChanges(registry),
-    [editedSinceSave, registry],
+    (): boolean => editedSinceSave || (viewerChanges.current?.hasUnsavedChanges() ?? false),
+    [editedSinceSave],
   );
 
   const closeDocument = useCallback(() => {

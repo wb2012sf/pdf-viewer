@@ -451,3 +451,9 @@ without undoing anything.
 - 2026-09-28 — macOS and Linux verification is **deprioritized** (user's call): those platforms have
   plenty of PDF tools already, so Windows is the platform that matters. Builds for them are not removed
   and nothing is done to break them; they are simply not checked. Desktop verification means Windows.
+- 2026-09-28 — "Unsaved" for edits made inside the viewer now means *changed since the last save*, not
+  *anything to undo*. The two agree until the first save and not after it: a saved form value stays
+  undoable, so the warning came back on every Close (reported from the desktop app). The history API has
+  no saved-position marker, so its change events are counted and a save records the count taken just
+  before the document is read. Undo-then-redo back to the saved state still warns; one warning too many
+  is the safe way for this to be wrong, and exact tracking would need the history's internals.

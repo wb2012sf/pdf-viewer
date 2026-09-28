@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 const SAMPLE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url));
+const FORM_PDF = fileURLToPath(new URL('./fixtures/form.pdf', import.meta.url));
 
 async function openSample(page: Page): Promise<void> {
   await page.goto('/');
@@ -24,17 +25,27 @@ async function rotateAPage(page: Page): Promise<void> {
  * the viewer about.
  */
 async function stampThePage(page: Page): Promise<void> {
-  await page.getByText('Insert', { exact: true }).click();
+  // Insert and the stamp tool both toggle, so a second stamp must not press
+  // them again: that would close the gallery the first one opened.
+  const galleryOpen = await page.evaluate(() =>
+    Array.from(document.querySelector('embedpdf-container')?.shadowRoot?.querySelectorAll('*') ?? []).some(
+      (el) => el.children.length === 0 && el.textContent?.trim() === 'Rubber Stamps',
+    ),
+  );
 
-  const tool = await page.evaluate(() => {
-    const element = document
-      .querySelector('embedpdf-container')
-      ?.shadowRoot?.querySelector('[aria-label="Rubber Stamp"]');
-    const rect = element!.getBoundingClientRect();
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-  });
-  await page.mouse.click(tool.x, tool.y);
-  await page.waitForTimeout(2500);
+  if (!galleryOpen) {
+    await page.getByRole('button', { name: 'Insert', exact: true }).click();
+
+    const tool = await page.evaluate(() => {
+      const element = document
+        .querySelector('embedpdf-container')
+        ?.shadowRoot?.querySelector('[aria-label="Rubber Stamp"]');
+      const rect = element!.getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.mouse.click(tool.x, tool.y);
+    await page.waitForTimeout(2500);
+  }
 
   const thumb = await page.evaluate(() => {
     const root = document.querySelector('embedpdf-container')?.shadowRoot;
@@ -171,6 +182,62 @@ test.describe('unsaved changes', () => {
     // The work is on disk now, so there is nothing left to warn about.
     await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
     await expect(page.getByTestId('empty-state')).toBeVisible();
+  });
+
+  test('stops warning once an annotated document has been saved', async ({ page }) => {
+    // The case the test above misses: a page operation rebuilds the viewer, so
+    // its undo history starts empty. An edit made *inside* the viewer — a
+    // stamp, a form value — stays undoable after saving, and "can undo" was
+    // being read as "unsaved". Reported from the desktop app, 2026-09-28.
+    await openSample(page);
+    await stampThePage(page);
+
+    await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      page.getByTestId('save').click(),
+    ]);
+
+    await page.getByTestId('close').click();
+
+    await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('empty-state')).toBeVisible();
+  });
+
+  test('stops warning once a filled-in form has been saved', async ({ page }) => {
+    // The exact report: fill in a form, save, close.
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(FORM_PDF);
+    const name = page.locator('embedpdf-container input[name="applicant.name"]');
+    await expect(name).toBeVisible({ timeout: 90_000 });
+    await name.fill('Ada Lovelace');
+    await name.press('Tab');
+
+    await page.getByTestId('close').click();
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    await page.getByTestId('confirm-cancel').click();
+
+    await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      page.getByTestId('save').click(),
+    ]);
+    await page.getByTestId('close').click();
+
+    await expect(page.getByTestId('confirm-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('empty-state')).toBeVisible();
+  });
+
+  test('warns again after an edit made since saving', async ({ page }) => {
+    await openSample(page);
+    await stampThePage(page);
+    await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      page.getByTestId('save').click(),
+    ]);
+
+    await stampThePage(page);
+    await page.getByTestId('close').click();
+
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   });
 
   test('the save button is labelled Save as', async ({ page }) => {
