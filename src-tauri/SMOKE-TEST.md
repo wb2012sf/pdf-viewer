@@ -64,8 +64,8 @@ The first `tauri:dev` compiles the whole Rust dependency tree — 5–15 minutes
 normal. After that it starts in seconds.
 
 Any installer `tauri:build` produces is unsigned, so Windows SmartScreen and
-macOS Gatekeeper will warn on first run. That is expected and is a separate open
-decision (see `DECISIONS.md`).
+macOS Gatekeeper will warn on first run. That is expected: installers are left
+unsigned by decision (see `DECISIONS.md`, 2026-09-28).
 
 ## What to actually check
 

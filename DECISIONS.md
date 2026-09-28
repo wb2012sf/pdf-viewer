@@ -448,3 +448,6 @@ without undoing anything.
 - 2026-09-28 — The two buttons are labelled with words, not icons, and appear only when some bookmark
   has children. A flat outline has nothing to open, and two arrows-in-a-box icons would read as the
   per-bookmark arrows beneath them.
+- 2026-09-28 — macOS and Linux verification is **deprioritized** (user's call): those platforms have
+  plenty of PDF tools already, so Windows is the platform that matters. Builds for them are not removed
+  and nothing is done to break them; they are simply not checked. Desktop verification means Windows.
