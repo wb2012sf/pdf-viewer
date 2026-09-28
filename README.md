@@ -59,8 +59,12 @@ Verified on Windows on 2026-08-31: the window opens, PDFium and Tesseract both r
 Save writes through the OS dialog, and all of it works with the network off. `src-tauri/SMOKE-TEST.md` has the
 per-platform prerequisites and the checklist.
 
-It is still unverified on macOS and Linux, and installers are unsigned, so SmartScreen and Gatekeeper will warn
-on first run.
+It is still unverified on macOS and Linux. Installers are deliberately unsigned (signing costs a yearly fee), so
+the first run warns once:
+
+- **Windows:** "Windows protected your PC" — click **More info**, then **Run anyway**.
+- **macOS:** the app is blocked — open **System Settings > Privacy & Security**, scroll down, and click
+  **Open Anyway** next to the message about PDF Workbench.
 
 ## Layout
 

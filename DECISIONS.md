@@ -281,8 +281,6 @@ One line per assumption made instead of interrupting a session, newest last.
 
 ## Open items
 
-- Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
-- Editable dropdowns cannot take a custom value — attempted and dropped 2026-09-28, see `KNOWN-ISSUES.md`.
 - File-select fields have no picker, and push buttons — now drawn, since `withForms` was switched on — still
   have no control behind them, so they cannot be pressed. See `KNOWN-ISSUES.md`.
 - Whether the dropdown arrow is fixed is unconfirmed: the fixture cannot show it either way, so it needs a
@@ -426,3 +424,19 @@ One line per assumption made instead of interrupting a session, newest last.
   viewer resolves them against a fixed internal map of its own 18 components and exposes no way to add
   one (only icons can be registered). Getting there would mean rebuilding the viewer's UI on the
   lower-level React plugins — a rewrite, not worth it to move one panel.
+- 2026-09-28 — Installers stay **unsigned**. Code-signing costs money every year (an Apple Developer
+  membership for macOS, a certificate or signing service for Windows), and the user chose not to spend it
+  on a friends-and-family tool. The cost is a first-run warning: click-through on Windows, a trip to
+  System Settings > Privacy & Security > Open Anyway on macOS. Moved to the backlog below, not rejected.
+
+## Backlog — maybe later
+
+Things deliberately set aside rather than refused. None is being worked on; each can be picked up
+without undoing anything.
+
+- **Code-signing the installers** (2026-09-28). Removes the SmartScreen and Gatekeeper warnings. Signing
+  happens at build time through Tauri's bundler config, so it can be added to any later release with no
+  code change, and a signed build installs over an unsigned one. Needs a paid Apple Developer membership
+  (macOS) and a code-signing certificate or signing service (Windows) — a spending decision for the user.
+- **Editable dropdowns taking a typed value** (2026-09-28). See `KNOWN-ISSUES.md` for what was tried and
+  the one route left: writing the value with pdf-lib whenever the document leaves the viewer.

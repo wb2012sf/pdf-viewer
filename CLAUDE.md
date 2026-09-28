@@ -1,6 +1,6 @@
 # Project memory: PDF workbench (Preview-equivalent tool)
 
-Last reviewed: 2026-08-30. Update this file whenever a decision below changes; do not let it drift from what the code actually does.
+Last reviewed: 2026-09-28. Update this file whenever a decision below changes; do not let it drift from what the code actually does.
 
 ## Repository
 
@@ -24,7 +24,7 @@ A cross-platform tool that replicates the PDF functionality of macOS Preview: vi
 - Page operations (merge/split/rotate/extract): pdf-lib, pure TS. Runs client-side; it has no Node-only dependency forcing a backend.
 - OCR: Tesseract.js (WASM), running client-side alongside PDFium — not ocrmypdf, not Docker, no server-side OCR service. Recognized text is merged back into the PDF as an invisible searchable layer using pdf-lib, built as project code rather than reused from ocrmypdf's pipeline, since ocrmypdf itself only works via Docker or a Python/Ghostscript/qpdf install, exactly what's being avoided. Bundle the language trained-data file(s) (English at minimum) with the app so OCR works fully offline, not fetched at runtime. Accepted tradeoff: lower recognition/deskew quality than ocrmypdf's pipeline, in exchange for zero external runtime dependencies.
 - Architecture consequence: with OCR now client-side too, nothing in the current feature scope requires a backend at all. The built output can be a static bundle (viewing, annotation, page manipulation, and OCR all run in the browser/webview). Do not add a Node/Express-style backend "just in case" — if a feature genuinely needs one later, that's a decision to make explicitly, not a default.
-- Distribution model: **decided — Tauri-packaged native installer.** Friends download and run a real installer (.exe on Windows, .dmg on Mac, .AppImage/.deb on Linux), fully offline, nothing else to install. No hosted-site path needed; do not build server/hosting infrastructure for distribution. Tauri wraps the same TypeScript/React frontend in a native webview, so this is additive to the frontend work, not a rewrite. Known open item, not yet resolved: an unsigned installer triggers Windows SmartScreen and macOS Gatekeeper warnings on first run; decide later whether code-signing is worth it for a friends-and-family tool or whether "click through the warning once" is acceptable.
+- Distribution model: **decided — Tauri-packaged native installer.** Friends download and run a real installer (.exe on Windows, .dmg on Mac, .AppImage/.deb on Linux), fully offline, nothing else to install. No hosted-site path needed; do not build server/hosting infrastructure for distribution. Tauri wraps the same TypeScript/React frontend in a native webview, so this is additive to the frontend work, not a rewrite. **Installers are unsigned (decided 2026-09-28):** no money is spent on code-signing, so Windows SmartScreen and macOS Gatekeeper warn on first run and friends click through once. Signing is on the backlog in `DECISIONS.md`, not rejected; do not buy certificates or set up signing unless asked.
 - Testing: Vitest for unit/integration tests, Playwright for browser/end-to-end tests (headless, no display server required).
 
 If a task seems to require deviating from this list, say so and explain why, rather than silently picking something else or stopping to ask which one to use.
