@@ -394,6 +394,12 @@ reasonable; the two views look alike and do different things.
 Overriding `ui.schema` wholesale is the same trap as issue 7's `commands`: it
 replaces rather than merges.
 
+(Found later, 2026-09-28: calling the UI capability's `mergeSchema` after
+start-up *does* merge sidebars by id, and redefining `sidebar-panel` to hold
+only `outline-sidebar` removes the Thumbnails tab cleanly. So the Thumbnails
+half of this has a workaround; say so if filing, and consider whether the
+config-time `ui.schema` should merge the same way. The Export half stands.)
+
 ### Ask
 
 Either give every schema entry a category, or provide a supported way to hide

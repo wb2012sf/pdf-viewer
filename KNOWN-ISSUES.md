@@ -178,9 +178,13 @@ rather than a `<select>`, and write the result back through `setFormValues`.
 That is a new control rather than an attribute patch, so unlike the two fixes
 above it needs a screenshot review before it can be called done.
 
-### Not a defect: the viewer has its own Thumbnails tab
+### The viewer's own Thumbnails tab — removed here
 
-There are two page views, and they are different things:
+**Removed** in `src/lib/viewer/sidebar.ts` (2026-09-28): the viewer's left
+sidebar now holds its Outline alone, with no tab strip. What follows is kept as
+the record of why.
+
+There were two page views, and they are different things:
 
 - **This app's Pages panel** (left, headed "Pages") — reorder by dragging or with
   ↑/↓, tick pages with click, shift-click or ctrl-click, rotate and delete per
@@ -230,7 +234,14 @@ What a patch would have to work with, since none of this is configurable:
   Outline tab with it — or adding a watcher that selects Outline when the
   sidebar opens, which patches the component's state and not merely its looks.
 
-Decision pending; see `DECISIONS.md`.
+None of those patches turned out to be needed. The UI plugin's runtime
+`mergeSchema` merges sidebars **by id** and replaces only the named sidebar's
+`content` — unlike `ui.schema` in the viewer config, which replaces the whole
+schema. So the `sidebar-panel` sidebar is redefined through the viewer's own API
+to show `outline-sidebar` directly, and the viewer redraws it without a remount.
+Hosting the Pages panel inside that sidebar instead is not possible with the
+ready-made viewer: it resolves `componentId`s against a fixed internal list and
+offers no way to register a component. See `DECISIONS.md`, 2026-09-28.
 ## Reporting these upstream
 
 Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste issues

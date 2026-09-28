@@ -318,7 +318,7 @@ One line per assumption made instead of interrupting a session, newest last.
   unaffected; only repeated mouse clicks at one spot are. Left as it stands pending a decision, because
   the alternatives are design changes rather than fixes: move the arrows out of the rows so they act on a
   selected document, or leave dragging as the gesture for a long move.
-- 2026-09-10 — **Open, needs a decision.** The viewer's own Thumbnails tab draws a rotated page at half
+- 2026-09-10 — **Resolved 2026-09-28, see below.** The viewer's own Thumbnails tab draws a rotated page at half
   the scale of an upright one (measured; see `KNOWN-ISSUES.md`). Hiding that tab is the preferred
   direction — it duplicates the Pages panel and has now produced five reports that were not about our
   code — but it cannot be hidden on its own: Thumbnails is the sidebar's default tab, so removing the
@@ -414,3 +414,14 @@ One line per assumption made instead of interrupting a session, newest last.
 - 2026-09-22 — A failed measurement reports the error and leaves the previous figure standing, down the same
   channel a failed save uses — it is the same failure (the viewer's export component being unavailable), and
   a number that is quietly wrong is worse than no new number.
+- 2026-09-28 — The viewer's Thumbnails tab is removed, and its sidebar holds the Outline alone (user's call,
+  after both halves were laid out). Done through the UI plugin's runtime `mergeSchema`, which merges
+  sidebars by id and swaps only `sidebar-panel`'s `content` — not the DOM patch or state watcher the
+  2026-09-10 entry anticipated, and not `ui.schema` in the config, which replaces the schema wholesale.
+  With one panel left the content is `outline-sidebar` itself rather than a one-tab strip, since a strip
+  with one tab is a control that does nothing.
+- 2026-09-28 — Putting the Pages panel *inside* the viewer's sidebar was looked at and is not possible
+  with `@embedpdf/react-pdf-viewer` 2.15.0: the schema accepts any `componentId`, but the ready-made
+  viewer resolves them against a fixed internal map of its own 18 components and exposes no way to add
+  one (only icons can be registered). Getting there would mean rebuilding the viewer's UI on the
+  lower-level React plugins — a rewrite, not worth it to move one panel.

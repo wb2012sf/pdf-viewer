@@ -36,6 +36,7 @@ import { bridgeViewerExport } from './lib/viewer/export-bridge';
 import { overrideDocumentCommands, type DocumentCommandHandlers } from './lib/viewer/document-commands';
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
 import { showPageInViewer, watchViewerPage } from './lib/viewer/page-sync';
+import { showOnlyOutlineInSidebar } from './lib/viewer/sidebar';
 
 interface OpenDocument {
   name: string;
@@ -149,6 +150,12 @@ export function App(): React.JSX.Element {
       onOpen: () => documentCommands.current.onOpen(),
       onClose: () => documentCommands.current.onClose(),
     });
+  }, [registry]);
+
+  // The viewer's Thumbnails tab looks like the Pages panel but only navigates;
+  // its sidebar keeps the Outline alone.
+  useEffect(() => {
+    if (registry) showOnlyOutlineInSidebar(registry);
   }, [registry]);
 
   // Follow the page the viewer is showing, so the panel marks it as the reader
