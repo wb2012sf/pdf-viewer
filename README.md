@@ -203,6 +203,16 @@ still a reduction, and `-edited` would say less about it.
 To overwrite the original deliberately, type its name back into the Save dialog. It is one deliberate act
 rather than the default.
 
+## Known limitations
+
+- **Editable dropdowns only take values from their list.** Some forms have a dropdown that also lets
+  you type your own value (Acrobat allows this). Here it behaves like an ordinary dropdown: you can
+  pick any listed value, but not type a new one. A fix was attempted and dropped on 2026-09-28, since
+  the viewer offers no way to record a value outside the list without restyling the field; see
+  `KNOWN-ISSUES.md` for what was tried and the one route left open.
+- Other form-field gaps (file-select fields, push buttons) and the viewer defects this app patches
+  are listed in `KNOWN-ISSUES.md`.
+
 ## Staying offline
 
 The packaged viewer fetches four things from the internet by default — the PDFium WASM binary, its own UI

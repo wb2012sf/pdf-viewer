@@ -168,15 +168,33 @@ that is not in the list; Acrobat allows this. The viewer renders every combo box
 as a plain `<select>`, which structurally cannot hold a value outside its
 options, so the custom value has nowhere to go.
 
-**Not yet worked around, but it is fixable rather than an upstream wall.**
-`@embedpdf/plugin-form` exposes `setFormValues(values: Record<string, string>)`,
-which writes any value into a field by name — so the shape of the fix is to
-detect the `Edit` flag with pdf-lib the way the max-length limits are read
-already, present those fields as an `<input>` with a `<datalist>` of the options
-rather than a `<select>`, and write the result back through `setFormValues`.
+**Not worked around — tried and dropped on 2026-09-28.** The control was the
+easy half: an `<input>` with a `<datalist>` of the options, in place of the
+`<select>`, worked and was tested. Getting a custom value *into the document*
+is what failed, three ways, all measured against 2.15.0:
 
-That is a new control rather than an attribute patch, so unlike the two fixes
-above it needs a screenshot review before it can be called done.
+- **`setFormValues`** does not write "any value". For a combo box it builds the
+  field with `isSelected` set on the option whose label matches, and the engine
+  then calls `FORM_SetIndexSelected` — with no option matching, it changes
+  nothing and still resolves `true`. A listed value saves; a custom one silently
+  does not.
+- **The engine's `setFormFieldValue(…, { kind: 'text' })`** (`FORM_SelectAllText`
+  + `FORM_ReplaceSelection`) resolves `true` on an editable combo box and leaves
+  the value as it was — read back unchanged immediately afterwards.
+- **The engine's widget-authoring path** (`addChoiceFieldContent`, reached via
+  create/update annotation) does write the value with
+  `EPDFAnnot_SetFormFieldValue`, but it also rewrites the widget's border style
+  (forced to solid), default appearance and `MK` colours. Ruled out: it changes
+  how someone's form looks.
+
+The one remaining route is this app's own: remember custom values and write
+them with pdf-lib (`PDFDropdown.select(value)` accepts a value outside the list
+when the field is editable) each time the document leaves the viewer — Save,
+page operations, OCR, size reduction and the viewer's own Export. Its costs: the
+drawn field shows the old value until the document is reloaded, the viewer's
+undo does not cover it, and the unsaved-changes check needs to know about it.
+Judged not worth it for how rarely editable dropdowns occur; revisit if one
+turns up in a document someone actually needs to fill in.
 
 ### The viewer's own Thumbnails tab — removed here
 

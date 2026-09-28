@@ -282,6 +282,7 @@ One line per assumption made instead of interrupting a session, newest last.
 ## Open items
 
 - Code-signing for the Tauri installer (SmartScreen/Gatekeeper) is still undecided — carried over from CLAUDE.md.
+- Editable dropdowns cannot take a custom value — attempted and dropped 2026-09-28, see `KNOWN-ISSUES.md`.
 - File-select fields have no picker, and push buttons — now drawn, since `withForms` was switched on — still
   have no control behind them, so they cannot be pressed. See `KNOWN-ISSUES.md`.
 - Whether the dropdown arrow is fixed is unconfirmed: the fixture cannot show it either way, so it needs a
