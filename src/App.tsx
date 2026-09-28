@@ -37,6 +37,7 @@ import { overrideDocumentCommands, type DocumentCommandHandlers } from './lib/vi
 import { readFieldConstraints, watchFormFields } from './lib/viewer/form-field-fixes';
 import { showPageInViewer, watchViewerPage } from './lib/viewer/page-sync';
 import { showOnlyOutlineInSidebar } from './lib/viewer/sidebar';
+import { watchOutlineControls } from './lib/viewer/outline-controls';
 
 interface OpenDocument {
   name: string;
@@ -156,6 +157,14 @@ export function App(): React.JSX.Element {
   // its sidebar keeps the Outline alone.
   useEffect(() => {
     if (registry) showOnlyOutlineInSidebar(registry);
+  }, [registry]);
+
+  // The Outline only has per-bookmark arrows; this adds Expand all and
+  // Collapse all above it. Watches the viewer's shadow root, since the
+  // sidebar is built and torn down as it opens and closes.
+  useEffect(() => {
+    const root = registry ? window.document.querySelector('embedpdf-container')?.shadowRoot : null;
+    return root ? watchOutlineControls(root) : undefined;
   }, [registry]);
 
   // Follow the page the viewer is showing, so the panel marks it as the reader

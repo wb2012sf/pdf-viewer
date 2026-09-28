@@ -85,4 +85,39 @@ test.describe("the viewer's sidebar", () => {
     await clickViewerText(page, 'Chapter 2');
     await expect(page.getByTestId('page-item-1')).toHaveAttribute('data-current', 'true', { timeout: 30_000 });
   });
+
+  // The viewer only offers a per-bookmark arrow; these two are this app's.
+  // See `src/lib/viewer/outline-controls.ts`.
+
+  test('collapses and expands every level of the outline at once', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(OUTLINE_PDF);
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await openSidebar(page);
+    await expect.poll(() => viewerText(page), { timeout: 30_000 }).toContain('Chapter 2');
+
+    // Collapsed children are not rendered at all, so their text disappears.
+    await page.getByTestId('outline-collapse-all').click();
+    await expect.poll(() => viewerText(page), { timeout: 10_000 }).not.toContain('Section 2.1');
+    expect(await viewerText(page)).toContain('Chapter 1');
+
+    await page.getByTestId('outline-expand-all').click();
+    await expect.poll(() => viewerText(page), { timeout: 10_000 }).toContain('Detail 2.1.1');
+    expect(await viewerText(page)).toContain('Section 2.1');
+    await page.screenshot({ path: 'test-results/viewer-sidebar-expand-all.png' });
+
+    // Collapsing from fully expanded hides the deepest level too.
+    await page.getByTestId('outline-collapse-all').click();
+    await expect.poll(() => viewerText(page), { timeout: 10_000 }).not.toContain('Detail 2.1.1');
+    await page.screenshot({ path: 'test-results/viewer-sidebar-collapse-all.png' });
+  });
+
+  test('offers no expand or collapse when there is no outline', async ({ page }) => {
+    await openSample(page);
+    await openSidebar(page);
+    await expect.poll(() => viewerText(page), { timeout: 30_000 }).toContain('No outline available');
+
+    await expect(page.getByTestId('outline-expand-all')).toHaveCount(0);
+    await expect(page.getByTestId('outline-collapse-all')).toHaveCount(0);
+  });
 });

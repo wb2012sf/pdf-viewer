@@ -29,6 +29,7 @@ async function write(name, bytes) {
 //   Chapter 1        -> page 1
 //   Chapter 2        -> page 2
 //     Section 2.1    -> page 3
+//       Detail 2.1.1 -> page 3
 {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -40,7 +41,7 @@ async function write(name, bytes) {
 
   const { context } = doc;
   const outlinesRef = context.nextRef();
-  const [chapter1, chapter2, section21] = [context.nextRef(), context.nextRef(), context.nextRef()];
+  const [chapter1, chapter2, section21, detail211] = [1, 2, 3, 4].map(() => context.nextRef());
   const item = (title, pageIndex, parent, extra) =>
     context.obj({
       Title: PDFHexString.fromText(title),
@@ -52,10 +53,11 @@ async function write(name, bytes) {
   context.assign(chapter1, item('Chapter 1', 0, outlinesRef, { Next: chapter2 }));
   context.assign(
     chapter2,
-    item('Chapter 2', 1, outlinesRef, { Prev: chapter1, First: section21, Last: section21, Count: 1 }),
+    item('Chapter 2', 1, outlinesRef, { Prev: chapter1, First: section21, Last: section21, Count: 2 }),
   );
-  context.assign(section21, item('Section 2.1', 2, chapter2, {}));
-  context.assign(outlinesRef, context.obj({ Type: 'Outlines', First: chapter1, Last: chapter2, Count: 3 }));
+  context.assign(section21, item('Section 2.1', 2, chapter2, { First: detail211, Last: detail211, Count: 1 }));
+  context.assign(detail211, item('Detail 2.1.1', 2, section21, {}));
+  context.assign(outlinesRef, context.obj({ Type: 'Outlines', First: chapter1, Last: chapter2, Count: 4 }));
   doc.catalog.set(PDFName.of('Outlines'), outlinesRef);
 
   await write('outline.pdf', await doc.save());

@@ -260,6 +260,26 @@ to show `outline-sidebar` directly, and the viewer redraws it without a remount.
 Hosting the Pages panel inside that sidebar instead is not possible with the
 ready-made viewer: it resolves `componentId`s against a fixed internal list and
 offers no way to register a component. See `DECISIONS.md`, 2026-09-28.
+
+### The Outline has no expand/collapse-all — added here
+
+The viewer's Outline gives each bookmark its own arrow and nothing else, and
+keeps which bookmarks are open in the component's private state; the bookmark
+plugin exposes no API for it.
+
+**Added** in `src/lib/viewer/outline-controls.ts` (2026-09-28): "Expand all" and
+"Collapse all" above the list, which press the arrows one at a time until every
+bookmark is in the wanted state. It relies on the `.outline-tree` class and the
+row-then-children shape beneath it.
+
+A quirk worth knowing, measured in the 2.15.0 source: open/closed state is keyed
+`bookmark-<index>` by a bookmark's index **within its own level**, not by its
+path. The first child of Chapter 2 shares a key with Chapter 1, so pressing one
+arrow can open or close a bookmark elsewhere in the tree. On first load every
+top-level key is open, which is why some nested bookmarks start open and others
+do not. Expand/collapse-all is unaffected, since it wants one state for every
+key; it is why the arrows are pressed one at a time and re-read after each.
+
 ## Reporting these upstream
 
 Drafted, not yet filed: see `UPSTREAM-ISSUES.md` for eight ready-to-paste issues

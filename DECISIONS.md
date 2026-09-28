@@ -440,3 +440,11 @@ without undoing anything.
   (macOS) and a code-signing certificate or signing service (Windows) — a spending decision for the user.
 - **Editable dropdowns taking a typed value** (2026-09-28). See `KNOWN-ISSUES.md` for what was tried and
   the one route left: writing the value with pdf-lib whenever the document leaves the viewer.
+- 2026-09-28 — Expand all / Collapse all in the Outline press the viewer's own arrows rather than
+  replacing its tree. The open/closed state is private to the component, so pressing is the only way to
+  change it, and a tree of our own would mean re-implementing bookmark navigation (XYZ destinations,
+  URI actions) that the viewer already gets right. Presses go one at a time with a re-read after each,
+  because the viewer keys that state by index within a level and two arrows can share one key.
+- 2026-09-28 — The two buttons are labelled with words, not icons, and appear only when some bookmark
+  has children. A flat outline has nothing to open, and two arrows-in-a-box icons would read as the
+  per-bookmark arrows beneath them.
