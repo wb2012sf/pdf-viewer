@@ -2,7 +2,7 @@
 // Run with: node tests/e2e/fixtures/make-fixture-pdf.mjs
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFHexString, PDFName, StandardFonts, rgb } from 'pdf-lib';
 
 async function write(name, bytes) {
   const out = fileURLToPath(new URL(`./${name}`, import.meta.url));
@@ -21,6 +21,44 @@ async function write(name, bytes) {
     page.drawText(`Sample fixture, page ${index + 1} of 2.`, { x: 48, y: 460, size: 12, font });
   }
   await write('sample.pdf', await doc.save());
+}
+
+// A document with bookmarks, for the viewer's Outline sidebar. pdf-lib has no
+// outline API, so the /Outlines tree is built from low-level objects:
+//
+//   Chapter 1        -> page 1
+//   Chapter 2        -> page 2
+//     Section 2.1    -> page 3
+{
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const pages = ['Chapter 1', 'Chapter 2', 'Section 2.1'].map((heading) => {
+    const page = doc.addPage([420, 595]);
+    page.drawText(heading, { x: 48, y: 500, size: 28, font, color: rgb(0.1, 0.1, 0.1) });
+    return page;
+  });
+
+  const { context } = doc;
+  const outlinesRef = context.nextRef();
+  const [chapter1, chapter2, section21] = [context.nextRef(), context.nextRef(), context.nextRef()];
+  const item = (title, pageIndex, parent, extra) =>
+    context.obj({
+      Title: PDFHexString.fromText(title),
+      Parent: parent,
+      Dest: [pages[pageIndex].ref, PDFName.of('Fit')],
+      ...extra,
+    });
+
+  context.assign(chapter1, item('Chapter 1', 0, outlinesRef, { Next: chapter2 }));
+  context.assign(
+    chapter2,
+    item('Chapter 2', 1, outlinesRef, { Prev: chapter1, First: section21, Last: section21, Count: 1 }),
+  );
+  context.assign(section21, item('Section 2.1', 2, chapter2, {}));
+  context.assign(outlinesRef, context.obj({ Type: 'Outlines', First: chapter1, Last: chapter2, Count: 3 }));
+  doc.catalog.set(PDFName.of('Outlines'), outlinesRef);
+
+  await write('outline.pdf', await doc.save());
 }
 
 // A document with real AcroForm fields, for exercising the viewer's Form tab.

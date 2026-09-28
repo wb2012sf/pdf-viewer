@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 const SAMPLE_PDF = fileURLToPath(new URL('./fixtures/sample.pdf', import.meta.url));
+const OUTLINE_PDF = fileURLToPath(new URL('./fixtures/outline.pdf', import.meta.url));
 
 /**
  * The viewer's own left sidebar.
@@ -29,15 +30,32 @@ async function viewerText(page: Page): Promise<string> {
   });
 }
 
+async function openSidebar(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const root = document.querySelector('embedpdf-container')?.shadowRoot;
+    (root?.querySelector('[aria-label="Sidebar"]') as HTMLElement | undefined)?.click();
+  });
+}
+
+/** Clicks the innermost element in the viewer whose text is exactly `text`. */
+async function clickViewerText(page: Page, text: string): Promise<void> {
+  const clicked = await page.evaluate((wanted) => {
+    const root = document.querySelector('embedpdf-container')?.shadowRoot;
+    const match = Array.from(root?.querySelectorAll<HTMLElement>('*') ?? []).find(
+      (el) => el.children.length === 0 && (el.textContent ?? '').trim() === wanted,
+    );
+    match?.click();
+    return Boolean(match);
+  }, text);
+  expect(clicked, `expected "${text}" in the viewer`).toBe(true);
+}
+
 test.describe("the viewer's sidebar", () => {
   test.slow();
 
   test('opens on the outline, with no Thumbnails tab', async ({ page }) => {
     await openSample(page);
-    await page.evaluate(() => {
-      const root = document.querySelector('embedpdf-container')?.shadowRoot;
-      (root?.querySelector('[aria-label="Sidebar"]') as HTMLElement | undefined)?.click();
-    });
+    await openSidebar(page);
 
     // sample.pdf has no bookmarks, so an open Outline says so.
     await expect.poll(() => viewerText(page), { timeout: 30_000 }).toContain('No outline available');
@@ -48,5 +66,23 @@ test.describe("the viewer's sidebar", () => {
     expect(tabs).toBe(0);
 
     await page.screenshot({ path: 'test-results/viewer-sidebar-outline.png' });
+  });
+
+  test("lists a document's bookmarks and jumps to them", async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('file-input').setInputFiles(OUTLINE_PDF);
+    await expect(page.locator('embedpdf-container img').first()).toBeVisible({ timeout: 90_000 });
+    await openSidebar(page);
+
+    // The top level is listed; the nested bookmark sits under Chapter 2.
+    await expect.poll(() => viewerText(page), { timeout: 30_000 }).toContain('Chapter 1');
+    expect(await viewerText(page)).toContain('Chapter 2');
+    await page.screenshot({ path: 'test-results/viewer-sidebar-bookmarks.png' });
+
+    // Following a bookmark moves the viewer, which the Pages panel follows.
+    await page.getByTestId('toggle-pages').click();
+    await expect(page.getByTestId('page-item-0')).toHaveAttribute('data-current', 'true', { timeout: 30_000 });
+    await clickViewerText(page, 'Chapter 2');
+    await expect(page.getByTestId('page-item-1')).toHaveAttribute('data-current', 'true', { timeout: 30_000 });
   });
 });
