@@ -459,7 +459,8 @@ without undoing anything.
   is the safe way for this to be wrong, and exact tracking would need the history's internals.
 - 2026-10-01 — The npm Tauri packages were bumped to the crates' minor versions (api 2.12, plugin-fs 2.6,
   plugin-dialog 2.8, cli 2.12) after `tauri build` on Windows refused to run on a version mismatch.
-  `Cargo.lock` is not committed and cannot be made here (no Rust on the dev machine), so the `"2"` crate
-  ranges float to the newest release on every fresh build while `package-lock.json` pins npm. Committing
-  the `Cargo.lock` produced by a successful Windows build would stop it recurring; until then, the next
-  Tauri minor release will break the build the same way.
+  `Cargo.lock` had never been committed (it cannot be made here: no Rust on the dev machine), so the `"2"`
+  crate ranges floated to the newest release on every fresh build while `package-lock.json` pinned npm.
+  The lockfile from the Windows build was committed the same day (tauri 2.12.0, plugin-fs 2.6.0,
+  plugin-dialog 2.8.0), which stops the drift. Upgrading Tauri now means moving both sides to the same
+  minor together: `cargo update` on Windows and `npm install` here.
