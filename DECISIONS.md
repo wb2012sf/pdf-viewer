@@ -457,3 +457,9 @@ without undoing anything.
   no saved-position marker, so its change events are counted and a save records the count taken just
   before the document is read. Undo-then-redo back to the saved state still warns; one warning too many
   is the safe way for this to be wrong, and exact tracking would need the history's internals.
+- 2026-10-01 — The npm Tauri packages were bumped to the crates' minor versions (api 2.12, plugin-fs 2.6,
+  plugin-dialog 2.8, cli 2.12) after `tauri build` on Windows refused to run on a version mismatch.
+  `Cargo.lock` is not committed and cannot be made here (no Rust on the dev machine), so the `"2"` crate
+  ranges float to the newest release on every fresh build while `package-lock.json` pins npm. Committing
+  the `Cargo.lock` produced by a successful Windows build would stop it recurring; until then, the next
+  Tauri minor release will break the build the same way.
