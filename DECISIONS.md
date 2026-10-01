@@ -464,3 +464,9 @@ without undoing anything.
   The lockfile from the Windows build was committed the same day (tauri 2.12.0, plugin-fs 2.6.0,
   plugin-dialog 2.8.0), which stops the drift. Upgrading Tauri now means moving both sides to the same
   minor together: `cargo update` on Windows and `npm install` here.
+- 2026-10-01 — GitHub Actions now runs CI (lint, type-check, unit and headless browser tests) and builds the
+  Windows installer, made possible by the repo going public, which makes Actions minutes free. The installer
+  is built on every push to main, as a run artifact; a `v*` tag also attaches it to a **draft** release, so
+  nothing reaches friends until the user publishes it by hand. The Rust build runs with `--locked`, so it fails
+  loudly rather than drifting if `Cargo.lock` and `Cargo.toml` ever disagree. Building on a PC still works and
+  is unchanged.
